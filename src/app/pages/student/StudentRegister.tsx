@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { FIELDS, PERIODS } from '../../data/mockData';
-import { CheckCircle, AlertCircle, Search } from 'lucide-react';
+import { FIELDS } from '../../data/mockData';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 
 export function StudentRegister() {
   const { user } = useAuth();
@@ -12,11 +14,13 @@ export function StudentRegister() {
   const [title, setTitle] = useState('');
   const [field, setField] = useState('');
   const [advisorId, setAdvisorId] = useState('');
-  const [period, setPeriod] = useState(PERIODS[PERIODS.length - 1]);
+  const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
+  const [period, setPeriod] = useState('');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
   const myRegistrations = thesisRegistrations.filter((r) => r.studentId === user?.id);
+  const bcttRegistration = myRegistrations.find((r) => r.type === 'BCTT');
   const hasBCTT = myRegistrations.some((r) => r.type === 'BCTT' && r.status === 'completed');
   const hasKLTN = myRegistrations.some((r) => r.type === 'KLTN');
 
@@ -30,6 +34,76 @@ export function StudentRegister() {
       })
     : teachers;
 
+  const normalizeText = (value: string) =>
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  const parseRegDate = (value: string): Date | null => {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const hasYear = /\b\d{4}\b/.test(raw);
+    const candidate = hasYear ? raw : `${raw} ${new Date().getFullYear()}`;
+    const withCurrentYear = new Date(candidate);
+    if (!Number.isNaN(withCurrentYear.getTime())) return withCurrentYear;
+
+    return null;
+  };
+
+  const currentStudentMajor =
+    users.find((u) => u.id === user?.id)?.expertise?.[0] ||
+    user?.expertise?.[0] ||
+    '';
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'dot'), (snapshot) => {
+      const periods = snapshot.docs
+        .map((docSnap) => {
+          const data = docSnap.data();
+          const periodValue = String(data.dot || data.maDot || data.tenDot || '').trim();
+          const periodMajor = String(data.major || '').trim();
+          const periodType = String(data.loaiDeTai || data.loaidetai || '').trim().toUpperCase();
+          const startRegDate = parseRegDate(String(data.startReg || ''));
+          const endRegDate = parseRegDate(String(data.endReg || ''));
+          const activeRaw = String(data.active ?? '').trim().toLowerCase();
+          const active =
+            data.active === true || ['true', '1', 'yes', 'y', 'active', 'x'].includes(activeRaw);
+
+          const now = new Date();
+          const isWithinRegWindow =
+            (!startRegDate || startRegDate <= now) && (!endRegDate || endRegDate >= now);
+
+          const isMajorMatched =
+            !currentStudentMajor ||
+            !periodMajor ||
+            normalizeText(periodMajor) === normalizeText(currentStudentMajor);
+          const isTypeMatched = !periodType || periodType === type;
+          return active && isMajorMatched && isWithinRegWindow && isTypeMatched ? periodValue : '';
+        })
+        .filter(Boolean);
+
+      const uniquePeriods = Array.from(new Set(periods));
+      setAvailablePeriods(uniquePeriods);
+
+      if (uniquePeriods.length > 0) {
+        setPeriod((prev) => prev || uniquePeriods[uniquePeriods.length - 1]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentStudentMajor, type]);
+
+  useEffect(() => {
+    if (type === 'KLTN' && bcttRegistration?.advisorId) {
+      setAdvisorId(bcttRegistration.advisorId);
+    }
+    if (type === 'BCTT') {
+      setAdvisorId('');
+    }
+  }, [type, bcttRegistration?.advisorId]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -37,17 +111,17 @@ export function StudentRegister() {
 
     // Validation
     if (type === 'KLTN' && !hasBCTT) {
-      setError('Bạn cần hoàn thành BCTT trước khi đăng ký KLTN');
+      setError('Báº¡n cáº§n hoÃ n thÃ nh BCTT trÆ°á»›c khi Ä‘Äƒng kÃ½ KLTN');
       return;
     }
 
     if (type === 'BCTT' && myRegistrations.some((r) => r.type === 'BCTT')) {
-      setError('Bạn đã đăng ký BCTT rồi');
+      setError('Báº¡n Ä‘Ã£ Ä‘Äƒng kÃ½ BCTT rá»“i');
       return;
     }
 
     if (type === 'KLTN' && hasKLTN) {
-      setError('Bạn đã đăng ký KLTN rồi');
+      setError('Báº¡n Ä‘Ã£ Ä‘Äƒng kÃ½ KLTN rá»“i');
       return;
     }
 
@@ -72,15 +146,15 @@ export function StudentRegister() {
   };
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Đăng ký đề tài</h1>
-        <p className="text-gray-600">Đăng ký báo cáo thực tập hoặc khóa luận tốt nghiệp</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">ÄÄƒng kÃ½ Ä‘á» tÃ i</h1>
+        <p className="text-gray-600">ÄÄƒng kÃ½ bÃ¡o cÃ¡o thá»±c táº­p hoáº·c khÃ³a luáº­n tá»‘t nghiá»‡p</p>
       </div>
 
       {/* Status Check */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Trạng thái đăng ký</h2>
+        <h2 className="font-semibold text-gray-900 mb-4">Tráº¡ng thÃ¡i Ä‘Äƒng kÃ½</h2>
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             {hasBCTT ? (
@@ -89,7 +163,7 @@ export function StudentRegister() {
               <AlertCircle className="w-5 h-5 text-yellow-500" />
             )}
             <span className="text-sm text-gray-700">
-              {hasBCTT ? 'Đã hoàn thành BCTT' : 'Chưa hoàn thành BCTT'}
+              {hasBCTT ? 'ÄÃ£ hoÃ n thÃ nh BCTT' : 'ChÆ°a hoÃ n thÃ nh BCTT'}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -99,7 +173,7 @@ export function StudentRegister() {
               <AlertCircle className="w-5 h-5 text-gray-400" />
             )}
             <span className="text-sm text-gray-700">
-              {hasKLTN ? 'Đã đăng ký KLTN' : 'Chưa đăng ký KLTN'}
+              {hasKLTN ? 'ÄÃ£ Ä‘Äƒng kÃ½ KLTN' : 'ChÆ°a Ä‘Äƒng kÃ½ KLTN'}
             </span>
           </div>
         </div>
@@ -111,7 +185,7 @@ export function StudentRegister() {
           {/* Type Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Loại đăng ký <span className="text-red-500">*</span>
+              Loáº¡i Ä‘Äƒng kÃ½ <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 gap-4">
               <button
@@ -123,8 +197,8 @@ export function StudentRegister() {
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <p className="font-medium text-gray-900">Báo cáo thực tập (BCTT)</p>
-                <p className="text-sm text-gray-600 mt-1">Báo cáo thực tập cơ sở</p>
+                <p className="font-medium text-gray-900">BÃ¡o cÃ¡o thá»±c táº­p (BCTT)</p>
+                <p className="text-sm text-gray-600 mt-1">BÃ¡o cÃ¡o thá»±c táº­p cÆ¡ sá»Ÿ</p>
               </button>
               <button
                 type="button"
@@ -136,8 +210,8 @@ export function StudentRegister() {
                     : 'border-gray-200 hover:border-gray-300'
                 } ${!hasBCTT ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <p className="font-medium text-gray-900">Khóa luận tốt nghiệp (KLTN)</p>
-                <p className="text-sm text-gray-600 mt-1">Yêu cầu hoàn thành BCTT</p>
+                <p className="font-medium text-gray-900">KhÃ³a luáº­n tá»‘t nghiá»‡p (KLTN)</p>
+                <p className="text-sm text-gray-600 mt-1">YÃªu cáº§u hoÃ n thÃ nh BCTT</p>
               </button>
             </div>
           </div>
@@ -145,14 +219,14 @@ export function StudentRegister() {
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tên đề tài <span className="text-red-500">*</span>
+              TÃªn Ä‘á» tÃ i <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Nhập tên đề tài..."
+              placeholder="Nháº­p tÃªn Ä‘á» tÃ i..."
               required
             />
           </div>
@@ -160,7 +234,7 @@ export function StudentRegister() {
           {/* Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Lĩnh vực <span className="text-red-500">*</span>
+              LÄ©nh vá»±c <span className="text-red-500">*</span>
             </label>
             <select
               value={field}
@@ -168,25 +242,19 @@ export function StudentRegister() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
-              <option value="">Chọn lĩnh vực</option>
+              <option value="">Chá»n lÄ©nh vá»±c</option>
               {FIELDS.map((f) => (
                 <option key={f} value={f}>
                   {f}
                 </option>
               ))}
             </select>
-            {field && (
-              <p className="mt-2 text-sm text-blue-600 flex items-center gap-2">
-                <Search className="w-4 h-4" />
-                Danh sách giảng viên đã được sắp xếp theo chuyên môn phù hợp
-              </p>
-            )}
           </div>
 
           {/* Advisor */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Giảng viên hướng dẫn <span className="text-red-500">*</span>
+              Giáº£ng viÃªn hÆ°á»›ng dáº«n <span className="text-red-500">*</span>
             </label>
             <select
               value={advisorId}
@@ -194,12 +262,12 @@ export function StudentRegister() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
-              <option value="">Chọn giảng viên</option>
+              <option value="">Chá»n giáº£ng viÃªn</option>
               {sortedTeachers.map((teacher) => {
                 const matchesField = teacher.expertise?.includes(field);
                 return (
                   <option key={teacher.id} value={teacher.id}>
-                    {teacher.fullName} {matchesField && '⭐'} - {teacher.expertise?.join(', ')}
+                    {teacher.fullName} {matchesField && 'â­'} - {teacher.expertise?.join(', ')}
                   </option>
                 );
               })}
@@ -209,7 +277,7 @@ export function StudentRegister() {
           {/* Period */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Đợt đăng ký <span className="text-red-500">*</span>
+              Äá»£t Ä‘Äƒng kÃ½ <span className="text-red-500">*</span>
             </label>
             <select
               value={period}
@@ -217,7 +285,8 @@ export function StudentRegister() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
-              {PERIODS.map((p) => (
+              {availablePeriods.length === 0 && <option value="">ChÆ°a cÃ³ Ä‘á»£t má»Ÿ Ä‘Äƒng kÃ½</option>}
+              {availablePeriods.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
@@ -229,7 +298,7 @@ export function StudentRegister() {
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
               <CheckCircle className="w-5 h-5" />
-              <span>Đăng ký thành công! Vui lòng chờ giảng viên phê duyệt.</span>
+              <span>ÄÄƒng kÃ½ thÃ nh cÃ´ng! Vui lÃ²ng chá» giáº£ng viÃªn phÃª duyá»‡t.</span>
             </div>
           )}
 
@@ -245,7 +314,7 @@ export function StudentRegister() {
             type="submit"
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition shadow-lg hover:shadow-xl"
           >
-            Đăng ký đề tài
+            ÄÄƒng kÃ½ Ä‘á» tÃ i
           </button>
         </form>
       </div>

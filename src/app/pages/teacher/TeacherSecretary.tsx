@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
+import { db } from '../../../lib/firebase';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Eye, FileText, X } from 'lucide-react';
 
 export function TeacherSecretary() {
@@ -17,15 +19,48 @@ export function TeacherSecretary() {
     return users.find((u) => u.id === studentId)?.fullName || 'N/A';
   };
 
-  const calculateFinalScore = (reg: any) => {
+  const calculateFinalScore = (reg: any): string => {
     const scores = [reg.advisorScore, reg.reviewerScore, reg.councilScore].filter((s) => s !== undefined);
     return scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2) : 'N/A';
   };
 
-  const handleSaveMinutes = (regId: string) => {
+  const openIfUrl = (url?: string) => {
+    if (!url) return;
+    if (url.startsWith('http')) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    alert('Biên bản đã lưu trong Firestore, xem nội dung tại phần góp ý hội đồng.');
+  };
+
+  const handleSaveMinutes = async (regId: string) => {
+    const reg = councilStudents.find((r) => r.id === regId);
+    if (!reg) return;
+    const finalScore = calculateFinalScore(reg);
+    const finalScoreNumber = finalScore === 'N/A' ? null : Number(finalScore);
+
+    await setDoc(
+      doc(db, 'bienban', regId),
+      {
+        registrationId: regId,
+        studentId: reg.studentId,
+        title: reg.title,
+        reviewerComments: reg.reviewerComments || '',
+        councilComments,
+        advisorScore: reg.advisorScore ?? null,
+        reviewerScore: reg.reviewerScore ?? null,
+        councilScore: reg.councilScore ?? null,
+        finalScore: finalScoreNumber,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+
     updateThesisRegistration(regId, {
-      councilMinutesUrl: 'mock-minutes-url',
-      councilComments: councilComments,
+      councilMinutesUrl: `firestore://bienban/${regId}`,
+      councilComments,
+      finalScore: finalScoreNumber ?? undefined,
+      status: finalScoreNumber !== null ? 'defended' : reg.status,
     });
     setEditingMinutes(null);
     setCouncilComments('');
@@ -92,6 +127,15 @@ export function TeacherSecretary() {
                       <FileText className="w-4 h-4" />
                       {reg.councilMinutesUrl ? 'Sửa biên bản hội đồng' : 'Tạo biên bản hội đồng'}
                     </button>
+                    {reg.councilMinutesUrl && (
+                      <button
+                        onClick={() => openIfUrl(reg.councilMinutesUrl)}
+                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2 mb-4"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Xem biên bản
+                      </button>
+                    )}
 
                     {/* Minutes Editor Dialog */}
                     {editingMinutes === reg.id && (

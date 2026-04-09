@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
+import { storage } from '../../../lib/firebase';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import {
   FileText,
   Upload,
@@ -18,6 +20,7 @@ export function StudentStatus() {
   const { thesisRegistrations, users, updateThesisRegistration } = useData();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const myRegistrations = thesisRegistrations.filter((r) => r.studentId === user?.id);
 
@@ -54,35 +57,76 @@ export function StudentStatus() {
     return statusMap[status] || status;
   };
 
-  const handleFileUpload = (regId: string, uploadType: 'pdf' | 'internship' | 'revised') => {
+  const isSubmissionOpen = (deadline?: string) => {
+    if (!deadline) return false;
+    const endDate = new Date(deadline);
+    if (Number.isNaN(endDate.getTime())) return false;
+    const now = new Date();
+    return now <= endDate;
+  };
+
+  const handleFileUpload = async (
+    regId: string,
+    uploadType: 'pdf' | 'internship' | 'revised' | 'explanation',
+  ) => {
     if (!selectedFile) {
       alert('Vui lòng chọn file');
       return;
     }
 
-    // Simulate upload
-    const updates: any = {
-      submittedAt: new Date().toISOString().split('T')[0],
-    };
+    try {
+      setIsUploading(true);
+      const registration = myRegistrations.find((r) => r.id === regId);
+      if (!registration || !user) {
+        throw new Error('Không tìm thấy thông tin đăng ký.');
+      }
 
-    if (uploadType === 'pdf') {
-      updates.pdfUrl = `mock-url-${selectedFile.name}`;
-      updates.status = 'submitted';
-    } else if (uploadType === 'internship') {
-      updates.internshipCertUrl = `mock-url-${selectedFile.name}`;
-    } else if (uploadType === 'revised') {
-      updates.revisedPdfUrl = `mock-url-${selectedFile.name}`;
-      updates.status = 'revision_pending';
+      if ((uploadType === 'pdf' || uploadType === 'internship') && !isSubmissionOpen(registration.submissionDeadline)) {
+        throw new Error('Đã quá hạn nộp hồ sơ cho đợt này.');
+      }
+
+      if ((uploadType === 'revised' || uploadType === 'explanation') && registration.status !== 'defended') {
+        throw new Error('Chỉ được nộp hồ sơ chỉnh sửa sau khi bảo vệ.');
+      }
+
+      const safeName = selectedFile.name.replace(/\s+/g, '_');
+      const filePath = `submissions/${registration.type}/${user.id}/${regId}/${uploadType}-${Date.now()}-${safeName}`;
+      const storageRef = ref(storage, filePath);
+      const uploadResult = await uploadBytes(storageRef, selectedFile, {
+        contentType: selectedFile.type || 'application/pdf',
+      });
+      const url = await getDownloadURL(uploadResult.ref);
+
+      const updates: Record<string, unknown> = {
+        submittedAt: new Date().toISOString().split('T')[0],
+      };
+
+      if (uploadType === 'pdf') {
+        updates.pdfUrl = url;
+        updates.status = 'submitted';
+      } else if (uploadType === 'internship') {
+        updates.internshipCertUrl = url;
+      } else if (uploadType === 'revised') {
+        updates.revisedPdfUrl = url;
+        updates.status = 'revision_pending';
+      } else if (uploadType === 'explanation') {
+        updates.revisionExplanationUrl = url;
+      }
+
+      updateThesisRegistration(regId, updates);
+      setSelectedFile(null);
+      setUploadingFor(null);
+      alert('Upload thành công!');
+    } catch (error) {
+      console.error(error);
+      alert('Upload thất bại, vui lòng thử lại.');
+    } finally {
+      setIsUploading(false);
     }
-
-    updateThesisRegistration(regId, updates);
-    setSelectedFile(null);
-    setUploadingFor(null);
-    alert('Upload thành công!');
   };
 
   const canUploadPdf = (reg: any) => {
-    return reg.status === 'advisor_approved' && !reg.pdfUrl;
+    return reg.status === 'advisor_approved' && !reg.pdfUrl && isSubmissionOpen(reg.submissionDeadline);
   };
 
   const canUploadRevised = (reg: any) => {
@@ -96,7 +140,7 @@ export function StudentStatus() {
   };
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Theo dõi trạng thái</h1>
         <p className="text-gray-600">Theo dõi tiến độ thực hiện đề tài của bạn</p>
@@ -144,6 +188,17 @@ export function StudentStatus() {
                     <div>
                       <p className="font-medium text-yellow-900">Sắp đến hạn nộp bài!</p>
                       <p className="text-sm text-yellow-700 mt-1">
+                        Hạn nộp: {new Date(reg.submissionDeadline).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {reg.submissionDeadline && !isSubmissionOpen(reg.submissionDeadline) && !reg.pdfUrl && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-red-900">Đã quá hạn nộp bài</p>
+                      <p className="text-sm text-red-700 mt-1">
                         Hạn nộp: {new Date(reg.submissionDeadline).toLocaleDateString('vi-VN')}
                       </p>
                     </div>
@@ -205,9 +260,10 @@ export function StudentStatus() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleFileUpload(reg.id, 'pdf')}
+                                disabled={isUploading}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
                               >
-                                Upload
+                                {isUploading ? 'Đang upload...' : 'Upload'}
                               </button>
                               <button
                                 onClick={() => {
@@ -242,9 +298,10 @@ export function StudentStatus() {
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => handleFileUpload(reg.id, 'internship')}
+                                    disabled={isUploading}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
                                   >
-                                    Upload
+                                    {isUploading ? 'Đang upload...' : 'Upload'}
                                   </button>
                                   <button
                                     onClick={() => {
@@ -282,7 +339,10 @@ export function StudentStatus() {
                         <p className="text-sm text-gray-600">
                           Ngày nộp: {reg.submittedAt ? new Date(reg.submittedAt).toLocaleDateString('vi-VN') : 'N/A'}
                         </p>
-                        <button className="mt-2 text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                        <button
+                          onClick={() => window.open(reg.pdfUrl, '_blank', 'noopener,noreferrer')}
+                          className="mt-2 text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
                           <Eye className="w-4 h-4" />
                           Xem bài đã nộp
                         </button>
@@ -370,9 +430,10 @@ export function StudentStatus() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleFileUpload(reg.id, 'revised')}
+                                disabled={isUploading}
                                 className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
                               >
-                                Upload
+                                {isUploading ? 'Đang upload...' : 'Upload'}
                               </button>
                               <button
                                 onClick={() => {
@@ -393,6 +454,45 @@ export function StudentStatus() {
                             Upload bài chỉnh sửa
                           </button>
                         )}
+
+                        <div className="mt-3">
+                          <p className="text-sm text-gray-700 mb-2">Biên bản giải trình chỉnh sửa:</p>
+                          {uploadingFor === `${reg.id}-explanation` ? (
+                            <div className="space-y-3">
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleFileUpload(reg.id, 'explanation')}
+                                  disabled={isUploading}
+                                  className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
+                                >
+                                  {isUploading ? 'Đang upload...' : 'Upload'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setUploadingFor(null);
+                                    setSelectedFile(null);
+                                  }}
+                                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
+                                >
+                                  Hủy
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setUploadingFor(`${reg.id}-explanation`)}
+                              className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
+                            >
+                              {reg.revisionExplanationUrl ? 'Đã upload giải trình ✓' : 'Upload giải trình'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -406,6 +506,25 @@ export function StudentStatus() {
                       <div className="flex-1">
                         <p className="font-medium text-gray-900 mb-2">Trạng thái duyệt chỉnh sửa</p>
                         <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            {reg.revisionExplanationUrl ? (
+                              <CheckCircle className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Clock className="w-4 h-4 text-yellow-500" />
+                            )}
+                            <span className="text-sm text-gray-700">
+                              Biên bản giải trình: {reg.revisionExplanationUrl ? 'Đã nộp' : 'Chưa nộp'}
+                            </span>
+                            {reg.revisionExplanationUrl && (
+                              <button
+                                onClick={() => window.open(reg.revisionExplanationUrl, '_blank', 'noopener,noreferrer')}
+                                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                              >
+                                <Eye className="w-4 h-4" />
+                                Xem
+                              </button>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             {reg.advisorApprovalRevision ? (
                               <CheckCircle className="w-4 h-4 text-green-500" />

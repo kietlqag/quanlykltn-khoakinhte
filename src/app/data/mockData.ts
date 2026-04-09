@@ -41,6 +41,9 @@ export interface ThesisRegistration {
   reviewerComments?: string;
   councilComments?: string;
   submissionDeadline?: string;
+  advisorCriteriaScores?: Record<string, number>;
+  reviewerCriteriaScores?: Record<string, number>;
+  councilCriteriaScores?: Record<string, number>;
 }
 
 export interface Council {

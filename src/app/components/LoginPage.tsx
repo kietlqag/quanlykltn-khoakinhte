@@ -1,57 +1,71 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router';
-import { GraduationCap, Lock, User } from 'lucide-react';
+import { Lock, User } from 'lucide-react';
+import loginCoverImage from '../../assets/bialogin.jpg';
+import hcmuteLogo from '../../assets/LogoHCMUTE-NoBG.png';
 
 export function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
 
-    if (login(username, password)) {
+    const success = await login(email, password);
+    if (success) {
       navigate('/dashboard');
     } else {
-      setError('Tên đăng nhập hoặc mật khẩu không đúng');
+      setError('Email hoặc mật khẩu không đúng');
     }
+    setIsSubmitting(false);
   };
 
   return (
-    <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo and Title */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-            <GraduationCap className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-blue-600">
-            Hệ thống Quản lý KLTN
-          </h1>
-          <p className="text-gray-600 mt-2">Đại học Công nghệ Kỹ thuật TP.HCM</p>
-        </div>
-
+    <div
+      className="h-screen overflow-hidden flex items-center justify-center p-4 bg-center bg-no-repeat bg-slate-100"
+      style={{
+        backgroundImage: `url(${loginCoverImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center 42%',
+      }}
+    >
+      <div className="w-full max-w-md max-h-full overflow-auto">
         {/* Login Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-white/60">
+          <div className="text-center mb-6">
+            <img
+              src={hcmuteLogo}
+              alt="Logo HCMUTE"
+              className="w-20 h-20 object-contain mx-auto mb-3"
+            />
+            <h1 className="text-base font-bold text-blue-600">
+              HỆ THỐNG QUẢN LÝ KHÓA LUẬN TỐT NGHIỆP
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">Khoa Kinh tế</p>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tên đăng nhập
+                Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                  placeholder="Nhập tên đăng nhập"
+                  placeholder="Nhập email"
                   required
                 />
               </div>
@@ -84,27 +98,13 @@ export function LoginPage() {
 
             <button
               type="submit"
+              disabled={isSubmitting}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition shadow-lg hover:shadow-xl"
             >
-              Đăng nhập
+              {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>
           </form>
 
-          {/* Demo Accounts */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 mb-3">Tài khoản demo:</p>
-            <div className="space-y-2 text-xs">
-              <div className="bg-gray-50 p-2 rounded">
-                <span className="font-medium">SV:</span> 2001212345 / 123456
-              </div>
-              <div className="bg-gray-50 p-2 rounded">
-                <span className="font-medium">GV:</span> gv.nguyenducthang / 123456
-              </div>
-              <div className="bg-gray-50 p-2 rounded">
-                <span className="font-medium">TBM:</span> tbm.admin / 123456
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -1,16 +1,56 @@
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
+import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 import { CheckCircle, Edit } from 'lucide-react';
 
 export function TbmTeacherApproval() {
   const { users, updateUser } = useData();
   const [editingQuota, setEditingQuota] = useState<{ id: string; quota: number } | null>(null);
+  const [quotaByEmail, setQuotaByEmail] = useState<Record<string, { id: string; maxSlot: number; approved: boolean }>>({});
 
   const teachers = users.filter((u) => u.role === 'GV');
 
-  const handleSaveQuota = (teacherId: string) => {
+  React.useEffect(() => {
+    const q = query(collection(db, 'quota'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const map: Record<string, { id: string; maxSlot: number; approved: boolean }> = {};
+      snapshot.docs.forEach((d) => {
+        const data = d.data();
+        const email = String(data.emailGV || '').toLowerCase();
+        if (!email) return;
+        map[email] = {
+          id: d.id,
+          maxSlot: Number(data.maxSlot ?? 0),
+          approved: Boolean(data.approved),
+        };
+      });
+      setQuotaByEmail(map);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSaveQuota = async (teacherId: string) => {
     if (editingQuota && editingQuota.id === teacherId) {
       updateUser(teacherId, { quota: editingQuota.quota });
+      const teacher = teachers.find((t) => t.id === teacherId);
+      const email = teacher?.email?.toLowerCase() || '';
+      const currentQuotaDoc = quotaByEmail[email];
+      if (currentQuotaDoc) {
+        await updateDoc(doc(db, 'quota', currentQuotaDoc.id), {
+          maxSlot: editingQuota.quota,
+          approved: true,
+        });
+      } else if (email) {
+        const q = query(collection(db, 'quota'), where('emailGV', '==', email));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          await updateDoc(doc(db, 'quota', snap.docs[0].id), {
+            maxSlot: editingQuota.quota,
+            approved: true,
+          });
+        }
+      }
       setEditingQuota(null);
       alert('Đã cập nhật quota');
     }
@@ -73,9 +113,16 @@ export function TbmTeacherApproval() {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="font-bold text-blue-600">{teacher.quota || 0} sinh viên</span>
+                          <span className="font-bold text-blue-600">
+                            {quotaByEmail[teacher.email.toLowerCase()]?.maxSlot ?? teacher.quota ?? 0} sinh viên
+                          </span>
                           <button
-                            onClick={() => setEditingQuota({ id: teacher.id, quota: teacher.quota || 0 })}
+                            onClick={() =>
+                              setEditingQuota({
+                                id: teacher.id,
+                                quota: quotaByEmail[teacher.email.toLowerCase()]?.maxSlot ?? teacher.quota ?? 0,
+                              })
+                            }
                             className="text-blue-600 hover:text-blue-700"
                           >
                             <Edit className="w-4 h-4" />
@@ -86,8 +133,14 @@ export function TbmTeacherApproval() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="text-sm text-gray-600">Đã duyệt</span>
+                  {quotaByEmail[teacher.email.toLowerCase()]?.approved ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="text-sm text-gray-600">Đã duyệt</span>
+                    </>
+                  ) : (
+                    <span className="text-sm text-yellow-700">Chưa duyệt</span>
+                  )}
                 </div>
               </div>
             </div>

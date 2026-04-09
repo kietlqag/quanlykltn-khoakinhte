@@ -1,8 +1,8 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Outlet, NavLink, useNavigate } from 'react-router';
+import hcmuteLogo from '../../assets/LogoHCMUTE-NoBG.png';
 import {
-  GraduationCap,
   LogOut,
   Home,
   FileText,
@@ -75,12 +75,14 @@ export function DashboardLayout() {
         {/* Logo */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-white" />
-            </div>
+            <img
+              src={hcmuteLogo}
+              alt="Logo HCMUTE"
+              className="w-10 h-10 object-contain"
+            />
             <div>
               <h2 className="font-bold text-gray-900">Quản lý KLTN</h2>
-              <p className="text-xs text-gray-500">HCMUTE</p>
+              <p className="text-xs text-gray-500">Khoa Kinh tế</p>
             </div>
           </div>
         </div>

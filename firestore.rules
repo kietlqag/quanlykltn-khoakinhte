@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStudent() {
+      return isSignedIn() && getUserRole() == 'SV';
+    }
+
+    function isLecturer() {
+      return isSignedIn() && (getUserRole() == 'GV' || getUserRole() == 'TBM');
+    }
+
+    function isTBM() {
+      return isSignedIn() && getUserRole() == 'TBM';
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isTBM() || (isSignedIn() && request.auth.uid == userId);
+    }
+
+    match /data/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isTBM();
+    }
+
+    match /trangthaidetai/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isLecturer() || isTBM() || isStudent();
+      allow delete: if isTBM();
+    }
+
+    match /tendetai/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isStudent() || isLecturer() || isTBM();
+      allow delete: if isTBM();
+    }
+
+    match /diem/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isLecturer() || isTBM();
+    }
+
+    match /diemhoidong/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isLecturer() || isTBM();
+    }
+
+    match /bienban/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isLecturer() || isTBM();
+    }
+
+    match /quota/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isTBM();
+    }
+
+    match /dot/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isTBM();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

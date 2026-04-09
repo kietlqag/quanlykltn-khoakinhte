@@ -28,7 +28,7 @@ import { ProfilePage } from './pages/ProfilePage';
 
 // Protected route component
 function ProtectedRoute({ children, role, roles }: { children: React.ReactNode; role?: string; roles?: string[] }) {
-  const currentUser = localStorage.getItem('currentUser');
+  const currentUser = sessionStorage.getItem('currentUser');
   
   if (!currentUser) {
     return <Navigate to="/" replace />;
@@ -47,7 +47,7 @@ function ProtectedRoute({ children, role, roles }: { children: React.ReactNode; 
 
 // Route component selector based on role
 function DashboardHome() {
-  const currentUser = localStorage.getItem('currentUser');
+  const currentUser = sessionStorage.getItem('currentUser');
   if (!currentUser) {
     return <Navigate to="/" replace />;
   }

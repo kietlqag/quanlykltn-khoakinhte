@@ -11,12 +11,17 @@ export function TeacherChairman() {
   const councilIds = chairmanCouncils.map((c) => c.id);
   const councilStudents = thesisRegistrations.filter((r) => r.councilId && councilIds.includes(r.councilId));
 
-  const studentsNeedingApproval = councilStudents.filter(
-    (r) => r.revisedPdfUrl && r.advisorApprovalRevision && !r.chairmanApprovalRevision
-  );
-
   const getStudentName = (studentId: string) => {
     return users.find((u) => u.id === studentId)?.fullName || 'N/A';
+  };
+
+  const openIfUrl = (url?: string) => {
+    if (!url) return;
+    if (url.startsWith('http')) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    alert('Tài liệu được lưu nội bộ trong Firestore.');
   };
 
   const handleApprove = (regId: string, approve: boolean) => {
@@ -57,30 +62,45 @@ export function TeacherChairman() {
 
                       <div className="space-y-3">
                         <div className="flex gap-3 flex-wrap">
-                          <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2">
+                          <button
+                            onClick={() => openIfUrl(reg.pdfUrl)}
+                            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                          >
                             <Eye className="w-4 h-4" />
                             Xem bài nộp
                           </button>
                           {reg.turnitinUrl && (
-                            <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2">
+                            <button
+                              onClick={() => openIfUrl(reg.turnitinUrl)}
+                              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                            >
                               <Eye className="w-4 h-4" />
                               Xem Turnitin
                             </button>
                           )}
                           {reg.councilMinutesUrl && (
-                            <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2">
+                            <button
+                              onClick={() => openIfUrl(reg.councilMinutesUrl)}
+                              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                            >
                               <Eye className="w-4 h-4" />
                               Biên bản hội đồng
                             </button>
                           )}
                           {reg.revisedPdfUrl && (
-                            <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2">
+                            <button
+                              onClick={() => openIfUrl(reg.revisedPdfUrl)}
+                              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                            >
                               <Eye className="w-4 h-4" />
                               Xem bài chỉnh sửa
                             </button>
                           )}
                           {reg.revisionExplanationUrl && (
-                            <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2">
+                            <button
+                              onClick={() => openIfUrl(reg.revisionExplanationUrl)}
+                              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                            >
                               <Eye className="w-4 h-4" />
                               Biên bản giải trình
                             </button>

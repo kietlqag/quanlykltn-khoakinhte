@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { Save, Plus } from 'lucide-react';
+import { collection, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+import { Save, Plus, Users } from 'lucide-react';
 
 export function TbmAssignCouncil() {
   const { thesisRegistrations, users, councils, updateThesisRegistration, addCouncil } = useData();
@@ -10,6 +12,7 @@ export function TbmAssignCouncil() {
     name: '',
     chairmanId: '',
     secretaryId: '',
+    memberIds: [] as string[],
     period: 'HK2-2025-2026',
   });
 
@@ -21,7 +24,7 @@ export function TbmAssignCouncil() {
     return students.find((s) => s.id === studentId)?.fullName || 'N/A';
   };
 
-  const handleAssign = (regId: string) => {
+  const handleAssign = async (regId: string) => {
     const councilId = assignments[regId];
     if (!councilId) {
       alert('Vui lòng chọn hội đồng');
@@ -33,6 +36,24 @@ export function TbmAssignCouncil() {
       defenseDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       defenseLocation: 'Phòng A101',
     });
+    const reg = thesisRegistrations.find((r) => r.id === regId);
+    const student = students.find((s) => s.id === reg?.studentId);
+    if (reg && student?.email) {
+      const statusQuery = query(
+        collection(db, 'trangthaidetai'),
+        where('emailSV', '==', student.email.toLowerCase()),
+        where('loaidetai', '==', reg.type),
+      );
+      const statusSnap = await getDocs(statusQuery);
+      for (const docSnap of statusSnap.docs) {
+        await updateDoc(docSnap.ref, {
+          councilId,
+          ngayHD: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          diadiem: 'Phòng A101',
+          updatedBy: 'TBM',
+        });
+      }
+    }
     alert('Đã phân công hội đồng');
   };
 
@@ -44,10 +65,10 @@ export function TbmAssignCouncil() {
     addCouncil({
       id: `HD${Date.now()}`,
       ...newCouncil,
-      members: [],
+      members: newCouncil.memberIds,
     });
     setShowCreateCouncil(false);
-    setNewCouncil({ name: '', chairmanId: '', secretaryId: '', period: 'HK2-2025-2026' });
+    setNewCouncil({ name: '', chairmanId: '', secretaryId: '', memberIds: [], period: 'HK2-2025-2026' });
     alert('Đã tạo hội đồng mới');
   };
 
@@ -110,6 +131,40 @@ export function TbmAssignCouncil() {
                 </select>
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Thành viên hội đồng (có thể chọn nhiều)
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {teachers
+                  .filter((t) => t.id !== newCouncil.chairmanId && t.id !== newCouncil.secretaryId)
+                  .map((t) => {
+                    const checked = newCouncil.memberIds.includes(t.id);
+                    return (
+                      <label key={t.id} className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewCouncil({
+                                ...newCouncil,
+                                memberIds: [...newCouncil.memberIds, t.id],
+                              });
+                            } else {
+                              setNewCouncil({
+                                ...newCouncil,
+                                memberIds: newCouncil.memberIds.filter((id) => id !== t.id),
+                              });
+                            }
+                          }}
+                        />
+                        {t.fullName}
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleCreateCouncil}
@@ -140,6 +195,12 @@ export function TbmAssignCouncil() {
               <p className="text-sm text-gray-600">
                 Chủ tịch: {teachers.find((t) => t.id === council.chairmanId)?.fullName} | 
                 Thư ký: {teachers.find((t) => t.id === council.secretaryId)?.fullName}
+              </p>
+              <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                Thành viên: {council.members.length > 0
+                  ? council.members.map((id) => teachers.find((t) => t.id === id)?.fullName || id).join(', ')
+                  : 'Chưa có'}
               </p>
             </div>
           ))}

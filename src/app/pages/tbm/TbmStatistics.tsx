@@ -4,20 +4,25 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { CheckCircle, X, Clock } from 'lucide-react';
 
 export function TbmStatistics() {
-  const { thesisRegistrations, users } = useData();
+  const { thesisRegistrations, users, updateThesisRegistration } = useData();
 
   const students = users.filter((u) => u.role === 'SV');
+  const periods = Array.from(new Set(thesisRegistrations.map((r) => r.period))).filter(Boolean);
+  const currentPeriod = periods[periods.length - 1];
+  const periodRegistrations = currentPeriod
+    ? thesisRegistrations.filter((r) => r.period === currentPeriod)
+    : thesisRegistrations;
 
   // Status distribution
   const statusData = [
-    { name: 'Chờ duyệt', value: thesisRegistrations.filter((r) => r.status === 'pending').length },
-    { name: 'Đã duyệt', value: thesisRegistrations.filter((r) => r.status === 'advisor_approved').length },
-    { name: 'Đã nộp', value: thesisRegistrations.filter((r) => r.status === 'submitted').length },
-    { name: 'Hoàn thành', value: thesisRegistrations.filter((r) => r.status === 'completed').length },
+    { name: 'Chờ duyệt', value: periodRegistrations.filter((r) => r.status === 'pending').length },
+    { name: 'Đã duyệt', value: periodRegistrations.filter((r) => r.status === 'advisor_approved').length },
+    { name: 'Đã nộp', value: periodRegistrations.filter((r) => r.status === 'submitted').length },
+    { name: 'Hoàn thành', value: periodRegistrations.filter((r) => r.status === 'completed').length },
   ];
 
   // Score distribution
-  const scoreData = thesisRegistrations
+  const scoreData = periodRegistrations
     .filter((r) => r.finalScore)
     .map((r) => ({
       student: students.find((s) => s.id === r.studentId)?.fullName || 'N/A',
@@ -26,7 +31,11 @@ export function TbmStatistics() {
     }));
 
   // Revision approval status
-  const revisionData = thesisRegistrations.filter((r) => r.revisedPdfUrl);
+  const revisionData = periodRegistrations.filter((r) => r.revisedPdfUrl);
+  const typeData = [
+    { name: 'BCTT', value: periodRegistrations.filter((r) => r.type === 'BCTT').length },
+    { name: 'KLTN', value: periodRegistrations.filter((r) => r.type === 'KLTN').length },
+  ];
 
   const COLORS = ['#3B82F6', '#8B5CF6', '#F59E0B', '#10B981'];
 
@@ -34,7 +43,9 @@ export function TbmStatistics() {
     <div className="max-w-6xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Thống kê</h1>
-        <p className="text-gray-600">Thống kê và báo cáo tổng quan hệ thống</p>
+        <p className="text-gray-600">
+          Thống kê và báo cáo tổng quan hệ thống{currentPeriod ? ` - Đợt ${currentPeriod}` : ''}
+        </p>
       </div>
 
       {/* Stats Overview */}
@@ -89,6 +100,30 @@ export function TbmStatistics() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+
+        {/* Type Pie Chart */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Phân bố loại đề tài</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={typeData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={(entry) => `${entry.name}: ${entry.value}`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {typeData.map((entry, index) => (
+                  <Cell key={`cell-type-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Revision Approval Table */}
@@ -137,18 +172,42 @@ export function TbmStatistics() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {reg.advisorApprovalRevision ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <Clock className="w-5 h-5 text-yellow-500" />
-                    )}
+                    <div className="flex items-center gap-2">
+                      {reg.advisorApprovalRevision ? (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <Clock className="w-5 h-5 text-yellow-500" />
+                      )}
+                      <button
+                        onClick={() =>
+                          updateThesisRegistration(reg.id, {
+                            advisorApprovalRevision: !reg.advisorApprovalRevision,
+                          })
+                        }
+                        className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                      >
+                        {reg.advisorApprovalRevision ? 'Đặt lại' : 'Cập nhật'}
+                      </button>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {reg.chairmanApprovalRevision ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <Clock className="w-5 h-5 text-yellow-500" />
-                    )}
+                    <div className="flex items-center gap-2">
+                      {reg.chairmanApprovalRevision ? (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <Clock className="w-5 h-5 text-yellow-500" />
+                      )}
+                      <button
+                        onClick={() =>
+                          updateThesisRegistration(reg.id, {
+                            chairmanApprovalRevision: !reg.chairmanApprovalRevision,
+                          })
+                        }
+                        className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                      >
+                        {reg.chairmanApprovalRevision ? 'Đặt lại' : 'Cập nhật'}
+                      </button>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {reg.advisorApprovalRevision && reg.chairmanApprovalRevision ? (

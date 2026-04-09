@@ -1,0 +1,39 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "trangthaidetai",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emailsv", "order": "ASCENDING" },
+        { "fieldPath": "loaidetai", "order": "ASCENDING" },
+        { "fieldPath": "trangthaiduyet", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tendetai",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emailsv", "order": "ASCENDING" },
+        { "fieldPath": "loaidetai", "order": "ASCENDING" },
+        { "fieldPath": "dothk", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "diem",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "email", "order": "ASCENDING" },
+        { "fieldPath": "role", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "quota",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emailgv", "order": "ASCENDING" },
+        { "fieldPath": "approved", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

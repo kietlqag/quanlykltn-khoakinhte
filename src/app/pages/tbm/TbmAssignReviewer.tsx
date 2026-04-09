@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
+import { collection, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 import { Save } from 'lucide-react';
 
 export function TbmAssignReviewer() {
@@ -18,13 +20,30 @@ export function TbmAssignReviewer() {
     return teachers.find((t) => t.id === advisorId)?.fullName || 'N/A';
   };
 
-  const handleAssign = (regId: string) => {
+  const handleAssign = async (regId: string) => {
     const reviewerId = assignments[regId];
     if (!reviewerId) {
       alert('Vui lòng chọn giảng viên phản biện');
       return;
     }
     updateThesisRegistration(regId, { reviewerId });
+    const reg = thesisRegistrations.find((r) => r.id === regId);
+    const student = students.find((s) => s.id === reg?.studentId);
+    const reviewer = teachers.find((t) => t.id === reviewerId);
+    if (reg && student?.email && reviewer?.email) {
+      const statusQuery = query(
+        collection(db, 'trangthaidetai'),
+        where('emailSV', '==', student.email.toLowerCase()),
+        where('loaidetai', '==', reg.type),
+      );
+      const statusSnap = await getDocs(statusQuery);
+      for (const docSnap of statusSnap.docs) {
+        await updateDoc(docSnap.ref, {
+          emailReviewer: reviewer.email.toLowerCase(),
+          updatedBy: 'TBM',
+        });
+      }
+    }
     alert('Đã phân công phản biện');
   };
 
