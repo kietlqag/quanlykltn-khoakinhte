@@ -20,6 +20,7 @@ export function TbmStatistics() {
     { name: 'Đã nộp', value: periodRegistrations.filter((r) => r.status === 'submitted').length },
     { name: 'Hoàn thành', value: periodRegistrations.filter((r) => r.status === 'completed').length },
   ];
+  const visibleStatusData = statusData.filter((item) => item.value > 0);
 
   // Score distribution
   const scoreData = periodRegistrations
@@ -36,6 +37,7 @@ export function TbmStatistics() {
     { name: 'BCTT', value: periodRegistrations.filter((r) => r.type === 'BCTT').length },
     { name: 'KLTN', value: periodRegistrations.filter((r) => r.type === 'KLTN').length },
   ];
+  const visibleTypeData = typeData.filter((item) => item.value > 0);
 
   const COLORS = ['#3B82F6', '#8B5CF6', '#F59E0B', '#10B981'];
 
@@ -68,20 +70,21 @@ export function TbmStatistics() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={statusData}
+                data={visibleStatusData}
                 cx="50%"
-                cy="50%"
+                cy="45%"
                 labelLine={false}
-                label={(entry) => `${entry.name}: ${entry.value}`}
+                label={false}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {statusData.map((entry, index) => (
+                {visibleStatusData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
+              <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -107,20 +110,21 @@ export function TbmStatistics() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={typeData}
+                data={visibleTypeData}
                 cx="50%"
-                cy="50%"
+                cy="45%"
                 labelLine={false}
-                label={(entry) => `${entry.name}: ${entry.value}`}
+                label={false}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {typeData.map((entry, index) => (
+                {visibleTypeData.map((entry, index) => (
                   <Cell key={`cell-type-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
+              <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
         </div>

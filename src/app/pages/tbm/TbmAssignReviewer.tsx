@@ -10,7 +10,9 @@ export function TbmAssignReviewer() {
 
   const teachers = users.filter((u) => u.role === 'GV');
   const students = users.filter((u) => u.role === 'SV');
-  const approvedRegistrations = thesisRegistrations.filter((r) => r.status === 'advisor_approved' || r.pdfUrl);
+  const approvedRegistrations = thesisRegistrations.filter(
+    (r) => r.type === 'KLTN' && (r.status === 'advisor_approved' || !!r.pdfUrl),
+  );
 
   const getStudentName = (studentId: string) => {
     return students.find((s) => s.id === studentId)?.fullName || 'N/A';

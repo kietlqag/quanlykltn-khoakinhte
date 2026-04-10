@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { db, storage } from '../../../lib/firebase';
+import { db } from '../../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { CheckCircle, X, Upload, Eye, Save, Users } from 'lucide-react';
 import { CriteriaBreakdown } from '../../components/CriteriaBreakdown';
 
@@ -24,6 +23,10 @@ export function TeacherAdvising() {
   const [criteriaScores, setCriteriaScores] = useState<Record<string, number>>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadMessage, setUploadMessage] = useState('');
+  const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   const [criteriaByType, setCriteriaByType] = useState<{ BCTT: Criterion[]; KLTN: Criterion[] }>({
     BCTT: [],
     KLTN: [],
@@ -83,6 +86,114 @@ export function TeacherAdvising() {
     }
   };
 
+  const sanitizeUploadSegment = (value: string) =>
+    String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 80) || 'file';
+
+  const uploadTurnitinFile = async (regId: string, regType: string, file: File) => {
+    if (!user) {
+      throw new Error('Không tìm thấy thông tin giảng viên.');
+    }
+    if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
+      throw new Error('Thiếu cấu hình Cloudinary. Hãy thiết lập VITE_CLOUDINARY_CLOUD_NAME và VITE_CLOUDINARY_UPLOAD_PRESET.');
+    }
+
+    const endpoint = `https://api.cloudinary.com/v1_1/${cloudinaryCloudName}/raw/upload`;
+    const folder = [
+      'truc_project',
+      'turnitin',
+      sanitizeUploadSegment(regType),
+      sanitizeUploadSegment(user.id),
+      sanitizeUploadSegment(regId),
+    ].join('/');
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    const extension = (file.name.split('.').pop() || 'pdf').toLowerCase();
+    const publicId = [
+      'turnitin',
+      Date.now().toString(),
+      sanitizeUploadSegment(baseName).slice(0, 40),
+    ]
+      .filter(Boolean)
+      .join('-')
+      .concat(`.${extension}`);
+
+    return new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+
+      formData.append('file', file);
+      formData.append('upload_preset', cloudinaryUploadPreset);
+      formData.append('folder', folder);
+      formData.append('public_id', publicId);
+      formData.append('resource_type', 'raw');
+      formData.append('type', 'upload');
+      formData.append('access_mode', 'public');
+
+      const startTimeout = window.setTimeout(() => {
+        xhr.abort();
+        reject(new Error('Upload không bắt đầu. Kiểm tra Cloudinary preset hoặc kết nối mạng.'));
+      }, 15000);
+
+      xhr.upload.onprogress = (event) => {
+        window.clearTimeout(startTimeout);
+        if (!event.lengthComputable) return;
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      };
+
+      xhr.onerror = () => {
+        window.clearTimeout(startTimeout);
+        reject(new Error('Upload Cloudinary thất bại do lỗi mạng.'));
+      };
+
+      xhr.onabort = () => {
+        window.clearTimeout(startTimeout);
+        reject(new Error('Upload đã bị hủy.'));
+      };
+
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+        window.clearTimeout(startTimeout);
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText) as {
+              secure_url?: string;
+              version?: number | string;
+              public_id?: string;
+            };
+            if (response.version && response.public_id) {
+              const normalizedPublicId = String(response.public_id).replace(/^\/+/, '');
+              resolve(`https://res.cloudinary.com/${cloudinaryCloudName}/raw/upload/v${response.version}/${normalizedPublicId}`);
+              return;
+            }
+            if (!response.secure_url) {
+              reject(new Error('Cloudinary không trả về secure_url.'));
+              return;
+            }
+            resolve(response.secure_url);
+          } catch {
+            reject(new Error('Không đọc được phản hồi Cloudinary.'));
+          }
+          return;
+        }
+
+        try {
+          const response = JSON.parse(xhr.responseText) as { error?: { message?: string } };
+          reject(new Error(response.error?.message || `Cloudinary upload failed with status ${xhr.status}.`));
+        } catch {
+          reject(new Error(`Cloudinary upload failed with status ${xhr.status}.`));
+        }
+      };
+
+      xhr.open('POST', endpoint);
+      xhr.send(formData);
+    });
+  };
+
   const handleUploadTurnitin = async (regId: string) => {
     if (!selectedFile) {
       alert('Vui lòng chọn file');
@@ -90,26 +201,25 @@ export function TeacherAdvising() {
     }
     try {
       setIsUploading(true);
+      setUploadProgress(0);
+      setUploadMessage('Đang tải Turnitin...');
       const reg = myStudents.find((r) => r.id === regId);
       if (!reg || !user) {
         throw new Error('Không tìm thấy thông tin hồ sơ.');
       }
-      const safeName = selectedFile.name.replace(/\s+/g, '_');
-      const filePath = `turnitin/${reg.type}/${user.id}/${regId}/${Date.now()}-${safeName}`;
-      const storageRef = ref(storage, filePath);
-      const uploaded = await uploadBytes(storageRef, selectedFile, {
-        contentType: selectedFile.type || 'application/pdf',
-      });
-      const turnitinUrl = await getDownloadURL(uploaded.ref);
+      const turnitinUrl = await uploadTurnitinFile(regId, reg.type, selectedFile);
       updateThesisRegistration(regId, { turnitinUrl });
       setUploadingTurnitin(null);
       setSelectedFile(null);
       alert('Upload Turnitin thành công');
     } catch (error) {
       console.error(error);
-      alert('Upload Turnitin thất bại');
+      const message = error instanceof Error ? error.message : 'Upload Turnitin thất bại';
+      alert(message);
     } finally {
       setIsUploading(false);
+      setUploadMessage('');
+      setUploadProgress(null);
     }
   };
 
@@ -125,6 +235,11 @@ export function TeacherAdvising() {
     setScoringFor(null);
     setCriteriaScores({});
     alert('Đã lưu điểm');
+  };
+
+  const handleMarkBcttPassed = (regId: string) => {
+    updateThesisRegistration(regId, { status: 'completed' });
+    alert('Đã xác nhận hoàn thành BCTT. Sinh viên có thể đăng ký KLTN.');
   };
 
   const pendingStudents = myStudents.filter((r) => r.status === 'pending');
@@ -347,13 +462,31 @@ export function TeacherAdvising() {
                 <div className="space-y-4">
                   {/* View Submission */}
                   <div>
-                    <button
-                      onClick={() => reg.pdfUrl && window.open(reg.pdfUrl, '_blank', 'noopener,noreferrer')}
-                      className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Xem bài nộp
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => reg.pdfUrl && window.open(reg.pdfUrl, '_blank', 'noopener,noreferrer')}
+                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Xem báo cáo đã nộp
+                      </button>
+                      {reg.type === 'BCTT' && (
+                        reg.internshipCertUrl ? (
+                          <button
+                            onClick={() =>
+                              reg.internshipCertUrl &&
+                              window.open(reg.internshipCertUrl, '_blank', 'noopener,noreferrer')
+                            }
+                            className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-2"
+                          >
+                            <Eye className="w-4 h-4" />
+                            Xem phiếu xác nhận thực tập
+                          </button>
+                        ) : (
+                          <p className="text-sm text-amber-600">Chưa có phiếu xác nhận thực tập</p>
+                        )
+                      )}
+                    </div>
                   </div>
 
                   {/* Upload Turnitin */}
@@ -361,38 +494,14 @@ export function TeacherAdvising() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Upload Turnitin Report
                     </label>
-                    {uploadingTurnitin === reg.id ? (
-                      <div className="space-y-2">
-                        <input
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                          className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleUploadTurnitin(reg.id)}
-                            disabled={isUploading}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                          >
-                            {isUploading ? 'Đang upload...' : 'Upload'}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setUploadingTurnitin(null);
-                              setSelectedFile(null);
-                            }}
-                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
-                          >
-                            Hủy
-                          </button>
-                        </div>
-                      </div>
-                    ) : reg.turnitinUrl ? (
+                    {reg.turnitinUrl ? (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-green-600">✓ Đã upload Turnitin</span>
                         <button
-                          onClick={() => setUploadingTurnitin(reg.id)}
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setUploadingTurnitin(reg.id);
+                          }}
                           className="text-sm text-blue-600 hover:text-blue-700"
                         >
                           Upload lại
@@ -400,7 +509,10 @@ export function TeacherAdvising() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => setUploadingTurnitin(reg.id)}
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setUploadingTurnitin(reg.id);
+                        }}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2"
                       >
                         <Upload className="w-4 h-4" />
@@ -408,6 +520,18 @@ export function TeacherAdvising() {
                       </button>
                     )}
                   </div>
+
+                  {reg.type === 'BCTT' && reg.status !== 'completed' && (
+                    <div>
+                      <button
+                        onClick={() => handleMarkBcttPassed(reg.id)}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center gap-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Xác nhận pass BCTT
+                      </button>
+                    </div>
+                  )}
 
                   {/* Grading */}
                   {reg.turnitinUrl && (
@@ -506,6 +630,11 @@ export function TeacherAdvising() {
                       <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
                         Đã chấm
                       </span>
+                      {reg.type === 'BCTT' && reg.status === 'completed' && (
+                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">
+                          Đã xác nhận pass BCTT
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-600 mb-1">
                       Sinh viên: <span className="font-medium text-gray-900">{getStudentName(reg.studentId)}</span>
@@ -526,6 +655,15 @@ export function TeacherAdvising() {
                         <Eye className="w-4 h-4" />
                         Xem Turnitin
                       </button>
+                      {reg.type === 'BCTT' && reg.status !== 'completed' && (
+                        <button
+                          onClick={() => handleMarkBcttPassed(reg.id)}
+                          className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Xác nhận pass BCTT
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -550,6 +688,98 @@ export function TeacherAdvising() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 text-lg">Chưa có sinh viên nào</p>
+        </div>
+      )}
+
+      {uploadingTurnitin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {(() => {
+              const activeReg = myStudents.find((item) => item.id === uploadingTurnitin);
+              if (!activeReg) return null;
+
+              return (
+                <>
+                  <div className="flex items-start justify-between border-b border-gray-200 px-6 py-5">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Upload Turnitin Report</h2>
+                      <p className="mt-1 text-sm text-gray-600">{activeReg.title}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (isUploading) return;
+                        setUploadingTurnitin(null);
+                        setSelectedFile(null);
+                      }}
+                      disabled={isUploading}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="px-6 py-6">
+                    <label className="block rounded-2xl border border-blue-200 bg-blue-50/70 p-5">
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100">
+                          <Upload className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">File Turnitin (PDF)</p>
+                          <p className="text-sm text-gray-600">Tải lên báo cáo Turnitin của sinh viên</p>
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        className="block w-full text-sm text-gray-600 file:mr-4 file:rounded-xl file:border-0 file:bg-blue-600 file:px-4 file:py-2.5 file:font-medium file:text-white hover:file:bg-blue-700"
+                      />
+                      {selectedFile && <p className="mt-3 text-sm text-gray-700">{selectedFile.name}</p>}
+                    </label>
+                  </div>
+
+                  {isUploading && (
+                    <div className="px-6 pb-2">
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="font-medium text-blue-900">{uploadMessage || 'Đang upload...'}</span>
+                          <span className="text-blue-700">{uploadProgress ?? 0}%</span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-100">
+                          <div
+                            className="h-full rounded-full bg-blue-600 transition-all"
+                            style={{ width: `${uploadProgress ?? 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                    <button
+                      onClick={() => {
+                        if (isUploading) return;
+                        setUploadingTurnitin(null);
+                        setSelectedFile(null);
+                      }}
+                      disabled={isUploading}
+                      className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      onClick={() => handleUploadTurnitin(activeReg.id)}
+                      disabled={!selectedFile || isUploading}
+                      className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                    >
+                      {isUploading ? 'Đang upload...' : 'Xác nhận upload'}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </div>
       )}
     </div>

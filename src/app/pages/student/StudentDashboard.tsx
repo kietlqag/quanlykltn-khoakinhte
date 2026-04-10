@@ -12,9 +12,17 @@ export function StudentDashboard() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
+      case 'advisor_approved':
+      case 'submitted':
+      case 'graded':
+      case 'defended':
         return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'pending':
         return <Clock className="w-5 h-5 text-yellow-500" />;
+      case 'revision_pending':
+        return <AlertCircle className="w-5 h-5 text-orange-500" />;
+      case 'advisor_rejected':
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
       default:
         return <AlertCircle className="w-5 h-5 text-blue-500" />;
     }
@@ -36,15 +44,11 @@ export function StudentDashboard() {
 
   return (
     <div className="w-full">
-      {/* Welcome Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Xin chào, {user?.fullName}!
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Xin chào, {user?.fullName}!</h1>
         <p className="text-gray-600">Chào mừng bạn đến với hệ thống quản lý khóa luận tốt nghiệp</p>
       </div>
 
-      {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
@@ -87,7 +91,6 @@ export function StudentDashboard() {
         </div>
       </div>
 
-      {/* My Registrations */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Đề tài của tôi</h2>
@@ -116,9 +119,7 @@ export function StudentDashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(reg.status)}
-                    <span className="text-sm font-medium text-gray-700">
-                      {getStatusText(reg.status)}
-                    </span>
+                    <span className="text-sm font-medium text-gray-700">{getStatusText(reg.status)}</span>
                   </div>
                 </div>
                 {reg.finalScore && (
@@ -134,7 +135,6 @@ export function StudentDashboard() {
         </div>
       </div>
 
-      {/* Important Notices */}
       <div className="mt-8 bg-blue-50 rounded-xl p-6 border border-blue-200">
         <h3 className="font-semibold text-gray-900 mb-3">Thông báo quan trọng</h3>
         <ul className="space-y-2 text-sm text-gray-700">

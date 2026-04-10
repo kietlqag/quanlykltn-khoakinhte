@@ -18,7 +18,11 @@ export function TbmAssignCouncil() {
 
   const teachers = users.filter((u) => u.role === 'GV');
   const students = users.filter((u) => u.role === 'SV');
-  const gradedRegistrations = thesisRegistrations.filter((r) => r.advisorScore && r.reviewerScore);
+  const gradedRegistrations = thesisRegistrations.filter((r) => {
+    if (!r.advisorScore) return false;
+    if (r.type === 'BCTT') return true;
+    return !!r.reviewerScore;
+  });
 
   const getStudentName = (studentId: string) => {
     return students.find((s) => s.id === studentId)?.fullName || 'N/A';

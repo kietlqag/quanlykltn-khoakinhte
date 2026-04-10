@@ -21,12 +21,11 @@ export function DashboardLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
-  // Menu items based on role
   const getMenuItems = () => {
     if (user?.role === 'SV') {
       return [
@@ -35,7 +34,9 @@ export function DashboardLayout() {
         { to: '/dashboard/status', icon: ClipboardList, label: 'Theo dõi trạng thái' },
         { to: '/dashboard/profile', icon: User, label: 'Thông tin cá nhân' },
       ];
-    } else if (user?.role === 'GV' || user?.role === 'TBM') {
+    }
+
+    if (user?.role === 'GV' || user?.role === 'TBM') {
       const teacherMenus = [
         { to: '/dashboard', icon: Home, label: 'Thông tin chung', end: true },
         { to: '/dashboard/advising', icon: Users, label: 'Hướng dẫn' },
@@ -46,8 +47,7 @@ export function DashboardLayout() {
         { to: '/dashboard/suggestions', icon: Lightbulb, label: 'Gợi ý đề tài' },
       ];
 
-      // TBM has all teacher menus + TBM specific menus
-      if (user?.role === 'TBM') {
+      if (user.role === 'TBM') {
         return [
           ...teacherMenus,
           { to: '/dashboard/teacher-approval', icon: UserCheck, label: 'Duyệt giảng viên', divider: true },
@@ -58,11 +58,9 @@ export function DashboardLayout() {
         ];
       }
 
-      return [
-        ...teacherMenus,
-        { to: '/dashboard/profile', icon: User, label: 'Thông tin cá nhân' },
-      ];
+      return [...teacherMenus, { to: '/dashboard/profile', icon: User, label: 'Thông tin cá nhân' }];
     }
+
     return [];
   };
 
@@ -70,16 +68,10 @@ export function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Sidebar */}
       <aside className="fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
-        {/* Logo */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <img
-              src={hcmuteLogo}
-              alt="Logo HCMUTE"
-              className="w-10 h-10 object-contain"
-            />
+            <img src={hcmuteLogo} alt="Logo HCMUTE" className="w-10 h-10 object-contain" />
             <div>
               <h2 className="font-bold text-gray-900">Quản lý KLTN</h2>
               <p className="text-xs text-gray-500">Khoa Kinh tế</p>
@@ -87,7 +79,6 @@ export function DashboardLayout() {
           </div>
         </div>
 
-        {/* User Info */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-medium">
@@ -104,17 +95,14 @@ export function DashboardLayout() {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 p-4 overflow-y-auto">
           <ul className="space-y-1">
-            {menuItems.map((item, index) => (
+            {menuItems.map((item) => (
               <React.Fragment key={item.to}>
                 {item.divider && (
                   <li className="py-3">
-                    <div className="border-t border-gray-200"></div>
-                    <p className="text-xs text-gray-500 mt-3 px-4 font-medium uppercase tracking-wider">
-                      Quản lý TBM
-                    </p>
+                    <div className="border-t border-gray-200" />
+                    <p className="text-xs text-gray-500 mt-3 px-4 font-medium uppercase tracking-wider">Quản lý TBM</p>
                   </li>
                 )}
                 <li>
@@ -123,9 +111,7 @@ export function DashboardLayout() {
                     end={item.end}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                        isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
+                        isActive ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'
                       }`
                     }
                   >
@@ -138,7 +124,6 @@ export function DashboardLayout() {
           </ul>
         </nav>
 
-        {/* Logout */}
         <div className="p-4 border-t border-gray-200 space-y-1">
           <button
             onClick={handleLogout}
@@ -150,7 +135,6 @@ export function DashboardLayout() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="ml-64 p-8">
         <Outlet />
       </main>

@@ -428,6 +428,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               });
             }
           }
+
+          const mirroredTopicUpdates: Record<string, unknown> = {};
+          if (typeof updates.pdfUrl === 'string') mirroredTopicUpdates.linkbai = updates.pdfUrl;
+          if (typeof updates.internshipCertUrl === 'string')
+            mirroredTopicUpdates.linkxacnhan = updates.internshipCertUrl;
+
+          if (Object.keys(mirroredTopicUpdates).length > 0) {
+            const topicQuery = query(
+              collection(db, 'tendetai'),
+              where('emailSV', '==', current.studentId),
+              where('loaidetai', '==', current.type),
+              limit(1),
+            );
+            const topicSnap = await getDocs(topicQuery);
+            if (!topicSnap.empty) {
+              tx.update(topicSnap.docs[0].ref, {
+                ...mirroredTopicUpdates,
+                updatedAt: serverTimestamp(),
+              });
+            }
+          }
         });
       } catch (error) {
         console.error('Update thesis registration failed:', error);

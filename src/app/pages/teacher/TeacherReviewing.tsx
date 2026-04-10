@@ -24,7 +24,7 @@ export function TeacherReviewing() {
     KLTN: [],
   });
 
-  const myReviewStudents = thesisRegistrations.filter((r) => r.reviewerId === user?.id);
+  const myReviewStudents = thesisRegistrations.filter((r) => r.type === 'KLTN' && r.reviewerId === user?.id);
 
   const getStudentName = (studentId: string) => {
     return users.find((u) => u.id === studentId)?.fullName || 'N/A';
