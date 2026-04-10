@@ -28,10 +28,13 @@ export function TbmAssignReviewer() {
       alert('Vui lòng chọn giảng viên phản biện');
       return;
     }
+
     updateThesisRegistration(regId, { reviewerId });
+
     const reg = thesisRegistrations.find((r) => r.id === regId);
     const student = students.find((s) => s.id === reg?.studentId);
     const reviewer = teachers.find((t) => t.id === reviewerId);
+
     if (reg && student?.email && reviewer?.email) {
       const statusQuery = query(
         collection(db, 'trangthaidetai'),
@@ -46,76 +49,76 @@ export function TbmAssignReviewer() {
         });
       }
     }
+
     alert('Đã phân công phản biện');
   };
 
   return (
-    <div className="max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Phân công phản biện</h1>
-        <p className="text-gray-600">Phân công giảng viên phản biện cho các đề tài</p>
-      </div>
+    <div className="max-w-6xl mx-auto">
+      <div className="rounded-2xl border border-gray-300 bg-white overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1020px] text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr className="text-gray-700">
+                <th className="px-4 py-3 text-left font-semibold uppercase text-xs tracking-wide w-[19%]">Sinh viên</th>
+                <th className="px-4 py-3 text-left font-semibold uppercase text-xs tracking-wide w-[24%]">Tên đề tài</th>
+                <th className="px-4 py-3 text-left font-semibold uppercase text-xs tracking-wide w-[11%]">Lĩnh vực</th>
+                <th className="px-4 py-3 text-left font-semibold uppercase text-xs tracking-wide w-[10%]">Đợt</th>
+                <th className="px-4 py-3 text-left font-semibold uppercase text-xs tracking-wide w-[16%]">Giảng viên hướng dẫn</th>
+                <th className="px-4 py-3 text-left font-semibold uppercase text-xs tracking-wide w-[20%]">Giảng viên phản biện</th>
+              </tr>
+            </thead>
+            <tbody>
+              {approvedRegistrations.map((reg) => (
+                <tr key={reg.id} className="border-b border-gray-100 hover:bg-gray-50 align-top">
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-gray-900">{getStudentName(reg.studentId)}</div>
+                    <div className="text-gray-500">{reg.studentId}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900 leading-5">{reg.title}</div>
+                  </td>
+                  <td className="px-4 py-3 text-blue-700">{reg.field || '-'}</td>
+                  <td className="px-4 py-3 text-gray-700">{reg.period || '-'}</td>
+                  <td className="px-4 py-3 text-gray-800">{getAdvisorName(reg.advisorId)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={assignments[reg.id] || reg.reviewerId || ''}
+                        onChange={(e) => setAssignments({ ...assignments, [reg.id]: e.target.value })}
+                        className="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                      >
+                        <option value="">Chọn GV phản biện</option>
+                        {teachers
+                          .filter((t) => t.id !== reg.advisorId)
+                          .map((teacher) => (
+                            <option key={teacher.id} value={teacher.id}>
+                              {teacher.fullName}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleAssign(reg.id)}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 inline-flex items-center gap-1 shrink-0"
+                      >
+                        <Save className="w-4 h-4" />
+                        Lưu
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Danh sách đề tài ({approvedRegistrations.length})
-          </h2>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {approvedRegistrations.map((reg) => (
-            <div key={reg.id} className="p-6">
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                    {reg.type}
-                  </span>
-                  <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
-                    {reg.period}
-                  </span>
-                  {reg.reviewerId && (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                      Đã phân công
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-semibold text-gray-900 mb-2">{reg.title}</h3>
-                <p className="text-sm text-gray-600">
-                  Sinh viên: <span className="font-medium">{getStudentName(reg.studentId)}</span> | 
-                  GVHD: <span className="font-medium">{getAdvisorName(reg.advisorId)}</span>
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <select
-                  value={assignments[reg.id] || reg.reviewerId || ''}
-                  onChange={(e) => setAssignments({ ...assignments, [reg.id]: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                >
-                  <option value="">Chọn GV phản biện</option>
-                  {teachers
-                    .filter((t) => t.id !== reg.advisorId)
-                    .map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.fullName} - {teacher.expertise?.join(', ')}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  onClick={() => handleAssign(reg.id)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  Lưu
-                </button>
-              </div>
-            </div>
-          ))}
-          {approvedRegistrations.length === 0 && (
-            <div className="p-12 text-center text-gray-500">
-              Chưa có đề tài nào cần phân công phản biện
-            </div>
-          )}
+              {approvedRegistrations.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                    Chưa có dữ liệu
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

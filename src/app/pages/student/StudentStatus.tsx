@@ -133,9 +133,6 @@ export function StudentStatus() {
       formData.append('upload_preset', cloudinaryUploadPreset);
       formData.append('folder', folder);
       formData.append('public_id', publicId);
-      formData.append('resource_type', 'raw');
-      formData.append('type', 'upload');
-      formData.append('access_mode', 'public');
 
       const startTimeout = window.setTimeout(() => {
         xhr.abort();
@@ -321,7 +318,7 @@ export function StudentStatus() {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
+      <div className="hidden">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Theo dõi trạng thái</h1>
         <p className="text-gray-600">Theo dõi tiến độ thực hiện đề tài của bạn</p>
       </div>

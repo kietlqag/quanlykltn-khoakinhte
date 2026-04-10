@@ -179,3 +179,29 @@
     line-height: 1.5;
   }
 }
+
+@layer utilities {
+  /* Custom scrollbar for the HCMUTE sidebar to avoid the default white track. */
+  .hcmute-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.35) #163b7a;
+  }
+
+  .hcmute-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .hcmute-scrollbar::-webkit-scrollbar-track {
+    background: #163b7a;
+  }
+
+  .hcmute-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    border: 2px solid #163b7a;
+  }
+
+  .hcmute-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+}

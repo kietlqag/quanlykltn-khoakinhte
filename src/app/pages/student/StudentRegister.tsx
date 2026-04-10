@@ -144,7 +144,7 @@ export function StudentRegister() {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
+      <div className="hidden">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Đăng ký đề tài</h1>
         <p className="text-gray-600">Đăng ký báo cáo thực tập hoặc khóa luận tốt nghiệp</p>
       </div>

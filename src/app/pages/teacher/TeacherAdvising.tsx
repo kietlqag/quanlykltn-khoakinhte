@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { db } from '../../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { CheckCircle, X, Upload, Eye, Save, Users } from 'lucide-react';
+import { CheckCircle, X, Upload, Eye, Save, Users, Search } from 'lucide-react';
 import { CriteriaBreakdown } from '../../components/CriteriaBreakdown';
 
 interface Criterion {
@@ -18,6 +18,8 @@ export function TeacherAdvising() {
   const { thesisRegistrations, users, updateThesisRegistration } = useData();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingTitle, setEditingTitle] = useState<{ id: string; title: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'bctt' | 'kltn'>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
   const [uploadingTurnitin, setUploadingTurnitin] = useState<string | null>(null);
   const [scoringFor, setScoringFor] = useState<string | null>(null);
   const [criteriaScores, setCriteriaScores] = useState<Record<string, number>>({});
@@ -37,6 +39,24 @@ export function TeacherAdvising() {
   const getStudentName = (studentId: string) => {
     const student = users.find((u) => u.id === studentId);
     return student?.fullName || 'N/A';
+  };
+
+  const normalizeSearch = (value: string) => String(value || '').toLowerCase().trim();
+  const matchesSearch = (reg: any) => {
+    const q = normalizeSearch(searchQuery);
+    if (!q) return true;
+    const haystack = [
+      reg?.studentId,
+      getStudentName(reg?.studentId),
+      reg?.title,
+      reg?.field,
+      reg?.type,
+      reg?.period,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(q);
   };
 
   useEffect(() => {
@@ -129,9 +149,6 @@ export function TeacherAdvising() {
       formData.append('upload_preset', cloudinaryUploadPreset);
       formData.append('folder', folder);
       formData.append('public_id', publicId);
-      formData.append('resource_type', 'raw');
-      formData.append('type', 'upload');
-      formData.append('access_mode', 'public');
 
       const startTimeout = window.setTimeout(() => {
         xhr.abort();
@@ -246,448 +263,334 @@ export function TeacherAdvising() {
   const submittedStudents = myStudents.filter((r) => r.pdfUrl && !r.advisorScore);
   const gradedStudents = myStudents.filter((r) => r.advisorScore);
   const revisionStudents = myStudents.filter((r) => r.revisedPdfUrl && !r.advisorApprovalRevision);
+  const advisingStudents = myStudents.filter((r) => r.status !== 'pending' && r.status !== 'advisor_rejected');
+  const advisingBcttStudents = advisingStudents.filter((r) => r.type === 'BCTT');
+  const advisingKltnStudents = advisingStudents.filter((r) => r.type === 'KLTN');
+
+  const filteredPendingStudents = pendingStudents.filter(matchesSearch);
+  const filteredRevisionStudents = revisionStudents.filter(matchesSearch);
+  const filteredSubmittedStudents = submittedStudents.filter(matchesSearch);
+  const filteredGradedStudents = gradedStudents.filter(matchesSearch);
+  const filteredAdvisingBcttStudents = advisingBcttStudents.filter(matchesSearch);
+  const filteredAdvisingKltnStudents = advisingKltnStudents.filter(matchesSearch);
+  const filteredAdvisingStudents =
+    activeTab === 'bctt' ? filteredAdvisingBcttStudents : filteredAdvisingKltnStudents;
   const getCriteriaForType = (type: 'BCTT' | 'KLTN') =>
     type === 'BCTT' ? criteriaByType.BCTT : criteriaByType.KLTN;
 
   return (
-    <div className="max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Hướng dẫn sinh viên</h1>
-        <p className="text-gray-600">Quản lý các sinh viên bạn hướng dẫn</p>
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="inline-flex rounded-full bg-gray-200 p-1 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('pending')}
+            className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
+              activeTab === 'pending' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Chờ duyệt ({pendingStudents.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('bctt')}
+            className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
+              activeTab === 'bctt' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Đang hướng dẫn BCTT ({advisingBcttStudents.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('kltn')}
+            className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
+              activeTab === 'kltn' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Đang hướng dẫn KLTN ({advisingKltnStudents.length})
+          </button>
+        </div>
+
+        <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setSelectedIds([]);
+            }}
+            placeholder="Tìm MSSV, Tên, Đề tài..."
+            className="w-full pl-10 pr-3 py-2.5 rounded-full border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
       </div>
 
-      {/* Revision Approval - After Defense */}
-      {revisionStudents.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-          <div className="px-6 py-4 border-b border-gray-200 bg-yellow-50">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Duyệt chỉnh sửa sau bảo vệ ({revisionStudents.length})
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Sinh viên đã nộp bài chỉnh sửa sau khi bảo vệ, cần duyệt trước khi Chủ tịch duyệt
-            </p>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {revisionStudents.map((reg) => (
-              <div key={reg.id} className="p-6">
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                      {reg.type}
-                    </span>
-                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">
-                      Chờ duyệt chỉnh sửa
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-1">
-                    Sinh viên: <span className="font-medium text-gray-900">{getStudentName(reg.studentId)}</span>
-                  </p>
-                  <h3 className="font-semibold text-gray-900">{reg.title}</h3>
-                </div>
-
-                <div className="space-y-4">
-                  {/* View Files */}
-                  <div className="flex gap-3 flex-wrap">
-                    <button
-                      onClick={() =>
-                        reg.councilMinutesUrl &&
-                        window.open(reg.councilMinutesUrl, '_blank', 'noopener,noreferrer')
-                      }
-                      className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Biên bản hội đồng
-                    </button>
-                    <button
-                      onClick={() =>
-                        reg.revisedPdfUrl &&
-                        window.open(reg.revisedPdfUrl, '_blank', 'noopener,noreferrer')
-                      }
-                      className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Xem bài chỉnh sửa
-                    </button>
-                    <button
-                      onClick={() =>
-                        reg.revisionExplanationUrl &&
-                        window.open(reg.revisionExplanationUrl, '_blank', 'noopener,noreferrer')
-                      }
-                      className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Biên bản giải trình
-                    </button>
-                  </div>
-
-                  {/* Approval Actions */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        updateThesisRegistration(reg.id, { advisorApprovalRevision: true });
-                        alert('Đã duyệt chỉnh sửa');
-                      }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Đồng ý chỉnh sửa
-                    </button>
-                    <button
-                      onClick={() => {
-                        updateThesisRegistration(reg.id, { advisorApprovalRevision: false });
-                        alert('Đã từ chối chỉnh sửa');
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Không đồng ý
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Pending Approvals */}
-      {pendingStudents.length > 0 && (
+      {activeTab === 'pending' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Chờ duyệt ({pendingStudents.length})
-            </h2>
-            {selectedIds.length > 0 && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleBulkApprove(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Duyệt ({selectedIds.length})
-                </button>
-                <button
-                  onClick={() => handleBulkApprove(false)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2"
-                >
-                  <X className="w-4 h-4" />
-                  Từ chối ({selectedIds.length})
-                </button>
-              </div>
-            )}
+          <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-end gap-2 flex-wrap bg-gray-50/70">
+            <button
+              onClick={() => handleBulkApprove(true)}
+              disabled={selectedIds.length === 0}
+              className="px-4 py-2 bg-green-600 text-white rounded-full text-sm font-semibold hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <CheckCircle className="w-4 h-4" />
+              Duyệt ({selectedIds.length})
+            </button>
+            <button
+              onClick={() => handleBulkApprove(false)}
+              disabled={selectedIds.length === 0}
+              className="px-4 py-2 bg-red-600 text-white rounded-full text-sm font-semibold hover:bg-red-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <X className="w-4 h-4" />
+              Từ chối ({selectedIds.length})
+            </button>
           </div>
+
+          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <div className="col-span-4 flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={selectedIds.length > 0 && selectedIds.length === filteredPendingStudents.length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedIds(filteredPendingStudents.map((r) => r.id));
+                  } else {
+                    setSelectedIds([]);
+                  }
+                }}
+              />
+              <span>Sinh viên</span>
+            </div>
+            <div className="col-span-5">Tên đề tài</div>
+            <div className="col-span-3 text-right">Hành động</div>
+          </div>
+
           <div className="divide-y divide-gray-200">
-            {pendingStudents.map((reg) => (
-              <div key={reg.id} className="p-6 hover:bg-gray-50">
-                <div className="flex items-start gap-4">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(reg.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedIds([...selectedIds, reg.id]);
-                      } else {
-                        setSelectedIds(selectedIds.filter((id) => id !== reg.id));
-                      }
-                    }}
-                    className="mt-1"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                        {reg.type}
-                      </span>
-                      <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
-                        {reg.period}
-                      </span>
+            {filteredPendingStudents.map((reg) => (
+              <div key={reg.id} className="px-6 py-4 hover:bg-gray-50">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:items-center">
+                  <div className="md:col-span-4 flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(reg.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds([...selectedIds, reg.id]);
+                        } else {
+                          setSelectedIds(selectedIds.filter((id) => id !== reg.id));
+                        }
+                      }}
+                      className="mt-1"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {getStudentName(reg.studentId)}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 flex-wrap text-xs text-gray-500">
+                        <span className="truncate">{reg.studentId}</span>
+                        <span>•</span>
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 font-medium rounded">{reg.type}</span>
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-medium rounded">
+                          {reg.period}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Sinh viên: <span className="font-medium text-gray-900">{getStudentName(reg.studentId)}</span>
-                    </p>
+                  </div>
+
+                  <div className="md:col-span-5 min-w-0">
                     {editingTitle?.id === reg.id ? (
                       <input
                         type="text"
                         value={editingTitle.title}
                         onChange={(e) => setEditingTitle({ ...editingTitle, title: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       />
                     ) : (
-                      <h3 className="font-semibold text-gray-900 mb-2">{reg.title}</h3>
+                      <div className="text-sm font-semibold text-gray-900 truncate">{reg.title}</div>
                     )}
-                    <p className="text-sm text-gray-600">Lĩnh vực: {reg.field}</p>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => handleEditTitle(reg)}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700"
-                      >
-                        {editingTitle?.id === reg.id ? 'Lưu' : 'Chỉnh sửa tên'}
-                      </button>
-                    </div>
+                    {reg.field && <div className="text-xs text-gray-500 truncate mt-1">{reg.field}</div>}
+                  </div>
+
+                  <div className="md:col-span-3 flex gap-2 md:justify-end flex-wrap">
+                    <button
+                      onClick={() => {
+                        updateThesisRegistration(reg.id, { status: 'advisor_approved' });
+                        setSelectedIds((prev) => prev.filter((id) => id !== reg.id));
+                        alert('Đã duyệt đề tài');
+                      }}
+                      className="px-3 py-1.5 bg-green-600 text-white rounded-full text-sm font-semibold hover:bg-green-700"
+                    >
+                      DUYỆT
+                    </button>
+                    <button
+                      onClick={() => {
+                        updateThesisRegistration(reg.id, { status: 'advisor_rejected' });
+                        setSelectedIds((prev) => prev.filter((id) => id !== reg.id));
+                        alert('Đã từ chối đề tài');
+                      }}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded-full text-sm font-semibold hover:bg-red-700"
+                    >
+                      TỪ CHỐI
+                    </button>
+                    <button
+                      onClick={() => handleEditTitle(reg)}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-full text-sm font-semibold hover:bg-blue-700"
+                    >
+                      {editingTitle?.id === reg.id ? 'LƯU' : 'SỬA TÊN'}
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
+
+            {filteredPendingStudents.length === 0 && (
+              <div className="px-6 py-10 text-center text-sm text-gray-500">
+                Chưa có dữ liệu
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Submitted - Need Grading */}
-      {submittedStudents.length > 0 && (
+      {/* Advising Table */}
+      {(activeTab === 'bctt' || activeTab === 'kltn') && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Đã nộp bài - Cần chấm điểm ({submittedStudents.length})
-            </h2>
-          </div>
+          {activeTab === 'kltn' ? (
+            <div className="hidden md:grid md:grid-cols-[2fr_2.6fr_1.1fr_1.1fr_0.8fr_1.1fr_1.3fr] gap-4 px-6 py-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <div>Sinh viên</div>
+              <div>Tên đề tài</div>
+              <div className="text-center">Bài làm</div>
+              <div className="text-center">Turnitin</div>
+              <div className="text-center">Điểm</div>
+              <div className="text-center">Chỉnh sửa</div>
+              <div className="text-center">Biên bản hội đồng</div>
+            </div>
+          ) : (
+            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <div className="col-span-3">Sinh viên</div>
+              <div className="col-span-4">Tên đề tài</div>
+              <div className="col-span-2 text-center">Bài làm</div>
+              <div className="col-span-2 text-center">Turnitin</div>
+              <div className="col-span-1 text-center">Điểm</div>
+            </div>
+          )}
+
           <div className="divide-y divide-gray-200">
-            {submittedStudents.map((reg) => (
-              <div key={reg.id} className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                        {reg.type}
-                      </span>
-                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                        Đã nộp bài
-                      </span>
+            {filteredAdvisingStudents.map((reg) => (
+              <div key={reg.id} className="px-6 py-4 hover:bg-gray-50">
+                <div
+                  className={`grid grid-cols-1 gap-3 md:items-center ${
+                    activeTab === 'kltn'
+                      ? 'md:grid-cols-[2fr_2.6fr_1.1fr_1.1fr_0.8fr_1.1fr_1.3fr]'
+                      : 'md:grid-cols-12'
+                  }`}
+                >
+                  <div className={activeTab === 'kltn' ? 'min-w-0' : 'md:col-span-3 min-w-0'}>
+                    <div className="text-sm font-semibold text-gray-900 truncate">{getStudentName(reg.studentId)}</div>
+                    <div className="text-xs text-gray-500 mt-1 truncate">
+                      {reg.studentId} - {reg.type}
                     </div>
-                    <p className="text-sm text-gray-600 mb-1">
-                      Sinh viên: <span className="font-medium text-gray-900">{getStudentName(reg.studentId)}</span>
-                    </p>
-                    <h3 className="font-semibold text-gray-900">{reg.title}</h3>
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  {/* View Submission */}
-                  <div>
-                    <div className="space-y-2">
+                  <div className={activeTab === 'kltn' ? 'min-w-0' : 'md:col-span-4 min-w-0'}>
+                    <div className="text-sm font-semibold text-gray-900 truncate">{reg.title}</div>
+                  </div>
+
+                  <div className={activeTab === 'kltn' ? 'md:text-center' : 'md:col-span-2 md:text-center'}>
+                    {reg.pdfUrl ? (
                       <button
-                        onClick={() => reg.pdfUrl && window.open(reg.pdfUrl, '_blank', 'noopener,noreferrer')}
-                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                        onClick={() => window.open(reg.pdfUrl, '_blank', 'noopener,noreferrer')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-200"
                       >
-                        <Eye className="w-4 h-4" />
-                        Xem báo cáo đã nộp
+                        <Eye className="w-3.5 h-3.5" />
+                        Xem bài
                       </button>
-                      {reg.type === 'BCTT' && (
-                        reg.internshipCertUrl ? (
-                          <button
-                            onClick={() =>
-                              reg.internshipCertUrl &&
-                              window.open(reg.internshipCertUrl, '_blank', 'noopener,noreferrer')
-                            }
-                            className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-2"
-                          >
-                            <Eye className="w-4 h-4" />
-                            Xem phiếu xác nhận thực tập
-                          </button>
-                        ) : (
-                          <p className="text-sm text-amber-600">Chưa có phiếu xác nhận thực tập</p>
-                        )
-                      )}
-                    </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
                   </div>
 
-                  {/* Upload Turnitin */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Upload Turnitin Report
-                    </label>
+                  <div className={activeTab === 'kltn' ? 'md:text-center' : 'md:col-span-2 md:text-center'}>
                     {reg.turnitinUrl ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-green-600">✓ Đã upload Turnitin</span>
-                        <button
-                          onClick={() => {
-                            setSelectedFile(null);
-                            setUploadingTurnitin(reg.id);
-                          }}
-                          className="text-sm text-blue-600 hover:text-blue-700"
-                        >
-                          Upload lại
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => window.open(reg.turnitinUrl, '_blank', 'noopener,noreferrer')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-100 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-200"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        Xem
+                      </button>
                     ) : (
                       <button
                         onClick={() => {
                           setSelectedFile(null);
                           setUploadingTurnitin(reg.id);
                         }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-100 rounded-lg text-xs font-medium text-indigo-700 hover:bg-indigo-200"
                       >
-                        <Upload className="w-4 h-4" />
-                        Upload Turnitin
+                        <Upload className="w-3.5 h-3.5" />
+                        Tải lên
                       </button>
                     )}
                   </div>
 
-                  {reg.type === 'BCTT' && reg.status !== 'completed' && (
-                    <div>
-                      <button
-                        onClick={() => handleMarkBcttPassed(reg.id)}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center gap-2"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Xác nhận pass BCTT
-                      </button>
-                    </div>
-                  )}
+                  <div className={activeTab === 'kltn' ? 'md:text-center' : 'md:col-span-1 md:text-center'}>
+                    <span
+                      className={`inline-flex items-center justify-center min-w-8 px-2 py-1 rounded-full text-xs font-bold ${
+                        reg.advisorScore ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                      }`}
+                    >
+                      {reg.advisorScore ?? 0}
+                    </span>
+                  </div>
 
-                  {/* Grading */}
-                  {reg.turnitinUrl && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Chấm điểm theo tiêu chí
-                      </label>
-                      {scoringFor === reg.id ? (
-                        <div className="space-y-3">
-                          {getCriteriaForType(reg.type).map((c) => (
-                            <div key={c.id} className="grid grid-cols-12 gap-2 items-center">
-                              <div className="col-span-8">
-                                <p className="text-sm font-medium text-gray-800">{c.label}</p>
-                                {c.description && <p className="text-xs text-gray-500">{c.description}</p>}
-                              </div>
-                              <div className="col-span-2 text-xs text-gray-500 text-right">Max {c.maxScore}</div>
-                              <input
-                                type="number"
-                                min="0"
-                                max={c.maxScore}
-                                step="0.1"
-                                value={criteriaScores[c.id] ?? 0}
-                                onChange={(e) =>
-                                  setCriteriaScores((prev) => ({
-                                    ...prev,
-                                    [c.id]: Math.max(0, Math.min(c.maxScore, Number(e.target.value || 0))),
-                                  }))
-                                }
-                                className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg"
-                              />
-                            </div>
-                          ))}
-                          <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                            <p className="text-sm font-semibold text-gray-700">
-                              Tổng: {(
-                                (reg.type === 'BCTT' ? criteriaByType.BCTT : criteriaByType.KLTN).reduce(
-                                  (sum, c) => sum + (criteriaScores[c.id] || 0),
-                                  0,
-                                )
-                              ).toFixed(2)}
-                            </p>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleSaveScore(reg.id)}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
-                              >
-                                <Save className="w-4 h-4" />
-                                Lưu điểm
-                              </button>
-                              <button
-                                onClick={() => setScoringFor(null)}
-                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
-                              >
-                                Hủy
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                  {activeTab === 'kltn' && (
+                    <div className="md:text-center">
+                      {reg.revisionExplanationUrl ? (
+                        <button
+                          onClick={() =>
+                            reg.revisionExplanationUrl &&
+                            window.open(reg.revisionExplanationUrl, '_blank', 'noopener,noreferrer')
+                          }
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-200"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Xem
+                        </button>
                       ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === 'kltn' && (
+                    <div className="md:text-center">
+                      {reg.councilMinutesUrl ? (
                         <button
-                          onClick={() => {
-                            setScoringFor(reg.id);
-                            setCriteriaScores((reg.advisorCriteriaScores as Record<string, number>) || {});
-                          }}
-                          className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700"
+                          onClick={() =>
+                            reg.councilMinutesUrl &&
+                            window.open(reg.councilMinutesUrl, '_blank', 'noopener,noreferrer')
+                          }
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-200"
                         >
-                          Nhập điểm
+                          <Eye className="w-3.5 h-3.5" />
+                          Xem
                         </button>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
                       )}
                     </div>
                   )}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
 
-      {/* Graded Students */}
-      {gradedStudents.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Đã chấm điểm ({gradedStudents.length})
-            </h2>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {gradedStudents.map((reg) => (
-              <div key={reg.id} className="p-6 hover:bg-gray-50">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                        {reg.type}
-                      </span>
-                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                        Đã chấm
-                      </span>
-                      {reg.type === 'BCTT' && reg.status === 'completed' && (
-                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">
-                          Đã xác nhận pass BCTT
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-1">
-                      Sinh viên: <span className="font-medium text-gray-900">{getStudentName(reg.studentId)}</span>
-                    </p>
-                    <h3 className="font-semibold text-gray-900 mb-2">{reg.title}</h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => reg.pdfUrl && window.open(reg.pdfUrl, '_blank', 'noopener,noreferrer')}
-                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <Eye className="w-4 h-4" />
-                        Xem bài nộp
-                      </button>
-                      <button
-                        onClick={() => reg.turnitinUrl && window.open(reg.turnitinUrl, '_blank', 'noopener,noreferrer')}
-                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <Eye className="w-4 h-4" />
-                        Xem Turnitin
-                      </button>
-                      {reg.type === 'BCTT' && reg.status !== 'completed' && (
-                        <button
-                          onClick={() => handleMarkBcttPassed(reg.id)}
-                          className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Xác nhận pass BCTT
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600 mb-1">Điểm GVHD</p>
-                    <p className="text-2xl font-bold text-green-600">{reg.advisorScore}</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <CriteriaBreakdown
-                    criteria={getCriteriaForType(reg.type)}
-                    scores={reg.advisorCriteriaScores}
-                    totalScore={reg.advisorScore}
-                  />
-                </div>
+            {filteredAdvisingStudents.length === 0 && (
+              <div className="px-6 py-10 text-center text-sm text-gray-500">
+                Chưa có dữ liệu
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
-
-      {myStudents.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg">Chưa có sinh viên nào</p>
         </div>
       )}
 

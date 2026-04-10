@@ -1,7 +1,7 @@
 import React from 'react';
 import { useData } from '../../contexts/DataContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { CheckCircle, X, Clock } from 'lucide-react';
+import { CheckCircle, Clock } from 'lucide-react';
+import { BarChart, Bar, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 export function TbmStatistics() {
   const { thesisRegistrations, users, updateThesisRegistration } = useData();
@@ -13,226 +13,179 @@ export function TbmStatistics() {
     ? thesisRegistrations.filter((r) => r.period === currentPeriod)
     : thesisRegistrations;
 
-  // Status distribution
-  const statusData = [
-    { name: 'Chờ duyệt', value: periodRegistrations.filter((r) => r.status === 'pending').length },
-    { name: 'Đã duyệt', value: periodRegistrations.filter((r) => r.status === 'advisor_approved').length },
-    { name: 'Đã nộp', value: periodRegistrations.filter((r) => r.status === 'submitted').length },
-    { name: 'Hoàn thành', value: periodRegistrations.filter((r) => r.status === 'completed').length },
-  ];
-  const visibleStatusData = statusData.filter((item) => item.value > 0);
+  const revisionRows = periodRegistrations.filter((r) => r.revisedPdfUrl || r.revisionExplanationUrl);
 
-  // Score distribution
-  const scoreData = periodRegistrations
-    .filter((r) => r.finalScore)
+  const getStudentName = (studentId: string) => students.find((s) => s.id === studentId)?.fullName || 'N/A';
+
+  const scoreChartData = revisionRows
+    .filter((r) => typeof r.finalScore === 'number')
     .map((r) => ({
-      student: students.find((s) => s.id === r.studentId)?.fullName || 'N/A',
-      score: r.finalScore,
-      type: r.type,
-    }));
+      name: getStudentName(r.studentId).split(' ').slice(-2).join(' '),
+      score: Number(r.finalScore),
+    }))
+    .slice(0, 8);
 
-  // Revision approval status
-  const revisionData = periodRegistrations.filter((r) => r.revisedPdfUrl);
-  const typeData = [
-    { name: 'BCTT', value: periodRegistrations.filter((r) => r.type === 'BCTT').length },
-    { name: 'KLTN', value: periodRegistrations.filter((r) => r.type === 'KLTN').length },
+  const advisorApproveData = [
+    { name: 'Đã duyệt', value: revisionRows.filter((r) => r.advisorApprovalRevision).length, color: '#22C55E' },
+    { name: 'Chưa duyệt', value: revisionRows.filter((r) => !r.advisorApprovalRevision).length, color: '#F59E0B' },
   ];
-  const visibleTypeData = typeData.filter((item) => item.value > 0);
 
-  const COLORS = ['#3B82F6', '#8B5CF6', '#F59E0B', '#10B981'];
+  const chairmanApproveData = [
+    { name: 'Đã duyệt', value: revisionRows.filter((r) => r.chairmanApprovalRevision).length, color: '#3B82F6' },
+    { name: 'Chưa duyệt', value: revisionRows.filter((r) => !r.chairmanApprovalRevision).length, color: '#EF4444' },
+  ];
+
+  const fieldData = Object.entries(
+    revisionRows.reduce<Record<string, number>>((acc, row) => {
+      const key = row.field || 'Chưa cập nhật';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {}),
+  ).map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Thống kê</h1>
-        <p className="text-gray-600">
-          Thống kê và báo cáo tổng quan hệ thống{currentPeriod ? ` - Đợt ${currentPeriod}` : ''}
-        </p>
-      </div>
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        {statusData.map((stat, index) => (
-          <div key={stat.name} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <p className="text-sm text-gray-600 mb-1">{stat.name}</p>
-            <p className="text-3xl font-bold" style={{ color: COLORS[index] }}>
-              {stat.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Status Pie Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Phân bố trạng thái</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={visibleStatusData}
-                cx="50%"
-                cy="45%"
-                labelLine={false}
-                label={false}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {visibleStatusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend verticalAlign="bottom" height={36} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Score Bar Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Điểm sinh viên</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={scoreData.slice(0, 5)}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="student" angle={-45} textAnchor="end" height={100} />
-              <YAxis domain={[0, 10]} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="score" fill="#3B82F6" name="Điểm" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Type Pie Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Phân bố loại đề tài</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={visibleTypeData}
-                cx="50%"
-                cy="45%"
-                labelLine={false}
-                label={false}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {visibleTypeData.map((entry, index) => (
-                  <Cell key={`cell-type-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend verticalAlign="bottom" height={36} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Revision Approval Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Trạng thái duyệt chỉnh sửa ({revisionData.length})
-          </h2>
-        </div>
+    <div className="mx-auto max-w-6xl space-y-5">
+      <div className="overflow-hidden rounded-2xl border border-gray-300 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sinh viên
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Đề tài
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Loại
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  GV HD
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Chủ tịch
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng thái
-                </th>
+          <table className="w-full min-w-[1020px] text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50">
+              <tr className="text-gray-700">
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide">Sinh viên</th>
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide">Tên đề tài</th>
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide">Lĩnh vực</th>
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide">Đợt</th>
+                <th className="whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide">Điểm</th>
+                <th className="whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide">GVHD duyệt sửa</th>
+                <th className="whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide">Chủ tịch duyệt sửa</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {revisionData.map((reg) => (
-                <tr key={reg.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {students.find((s) => s.id === reg.studentId)?.fullName || 'N/A'}
+            <tbody>
+              {revisionRows.map((row) => (
+                <tr key={row.id} className="border-b border-gray-100 align-top hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-gray-900">{getStudentName(row.studentId)}</div>
+                    <div className="text-gray-500">{row.studentId}</div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate">
-                    {reg.title}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                      {reg.type}
+                  <td className="px-4 py-3 font-medium text-gray-900">{row.title}</td>
+                  <td className="px-4 py-3 text-blue-700">{row.field || '-'}</td>
+                  <td className="px-4 py-3 text-gray-700">{row.period || '-'}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-blue-100 px-2 py-1 text-base font-bold text-blue-700">
+                      {typeof row.finalScore === 'number' ? row.finalScore.toFixed(1) : '0'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    <div className="flex items-center gap-2">
-                      {reg.advisorApprovalRevision ? (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                  <td className="px-4 py-3 text-center">
+                    <div className="inline-flex items-center gap-2">
+                      {row.advisorApprovalRevision ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          Đã duyệt
+                        </span>
                       ) : (
-                        <Clock className="w-5 h-5 text-yellow-500" />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          <Clock className="h-3.5 w-3.5" />
+                          Chờ duyệt
+                        </span>
                       )}
-                      <button
-                        onClick={() =>
-                          updateThesisRegistration(reg.id, {
-                            advisorApprovalRevision: !reg.advisorApprovalRevision,
-                          })
-                        }
-                        className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                      >
-                        {reg.advisorApprovalRevision ? 'Đặt lại' : 'Cập nhật'}
-                      </button>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    <div className="flex items-center gap-2">
-                      {reg.chairmanApprovalRevision ? (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                  <td className="px-4 py-3 text-center">
+                    <div className="inline-flex items-center gap-2">
+                      {row.chairmanApprovalRevision ? (
+                        <button
+                          onClick={() =>
+                            updateThesisRegistration(row.id, {
+                              chairmanApprovalRevision: false,
+                            })
+                          }
+                          className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700 hover:bg-green-200"
+                        >
+                          Đã duyệt
+                        </button>
                       ) : (
-                        <Clock className="w-5 h-5 text-yellow-500" />
+                        <button
+                          onClick={() =>
+                            updateThesisRegistration(row.id, {
+                              chairmanApprovalRevision: true,
+                            })
+                          }
+                          className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                        >
+                          Chờ duyệt
+                        </button>
                       )}
-                      <button
-                        onClick={() =>
-                          updateThesisRegistration(reg.id, {
-                            chairmanApprovalRevision: !reg.chairmanApprovalRevision,
-                          })
-                        }
-                        className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                      >
-                        {reg.chairmanApprovalRevision ? 'Đặt lại' : 'Cập nhật'}
-                      </button>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {reg.advisorApprovalRevision && reg.chairmanApprovalRevision ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                        Hoàn thành
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">
-                        Đang xử lý
-                      </span>
-                    )}
                   </td>
                 </tr>
               ))}
+              {revisionRows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">
+                    Chưa có dữ liệu
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-          {revisionData.length === 0 && (
-            <div className="p-12 text-center text-gray-500">
-              Chưa có sinh viên nào nộp bài chỉnh sửa
-            </div>
-          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-300 bg-white p-4">
+        <h2 className="text-lg font-semibold text-gray-900">Biểu đồ liên quan</h2>
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-gray-200 p-3">
+            <p className="mb-2 text-sm font-semibold text-gray-700">Phân bố điểm</p>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={scoreChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis domain={[0, 10]} />
+                <Tooltip />
+                <Bar dataKey="score" fill="#3B82F6" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-3">
+            <p className="mb-2 text-sm font-semibold text-gray-700">Duyệt sửa của GVHD</p>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={advisorApproveData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={78} label>
+                  {advisorApproveData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-3">
+            <p className="mb-2 text-sm font-semibold text-gray-700">Duyệt sửa của Chủ tịch</p>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={chairmanApproveData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={78} label>
+                  {chairmanApproveData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-3">
+            <p className="mb-2 text-sm font-semibold text-gray-700">Số lượng theo lĩnh vực</p>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={fieldData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#6366F1" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>

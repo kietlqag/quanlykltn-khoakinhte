@@ -44,7 +44,7 @@ export function StudentDashboard() {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
+      <div className="hidden">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Xin chào, {user?.fullName}!</h1>
         <p className="text-gray-600">Chào mừng bạn đến với hệ thống quản lý khóa luận tốt nghiệp</p>
       </div>
