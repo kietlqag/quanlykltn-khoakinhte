@@ -17,6 +17,8 @@ export interface ThesisRegistration {
   studentId: string;
   type: 'BCTT' | 'KLTN';
   title: string;
+  registeredAt?: string;
+  companyName?: string;
   field: string;
   advisorId: string;
   reviewerId?: string;

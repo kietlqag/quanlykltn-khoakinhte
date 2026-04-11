@@ -126,11 +126,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       (snapshot) => {
         const mapped: ThesisRegistration[] = snapshot.docs.map((d) => {
           const data = d.data();
+          const createdAtRaw = data.createdAt as { toDate?: () => Date } | undefined;
+          const registeredAt =
+            String(data.registeredAt || '').trim() ||
+            (createdAtRaw?.toDate ? createdAtRaw.toDate().toISOString().split('T')[0] : '');
           return {
             id: d.id,
             studentId: String(data.studentId || ''),
             type: mapLoaiDetai(String(data.type || data.loaiDeTai || 'BCTT')),
             title: String(data.title || ''),
+            registeredAt: registeredAt || undefined,
+            companyName: String(data.companyName || '') || undefined,
             field: String(data.field || ''),
             advisorId: String(data.advisorId || ''),
             reviewerId: String(data.reviewerId || '') || undefined,
@@ -317,31 +323,49 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               throw new Error('Bạn cần hoàn thành BCTT trước khi đăng ký KLTN.');
             }
           }
-
-          const quotaQuery = query(
-            collection(db, 'quota'),
-            where('emailGV', '==', advisorEmailCandidate),
-            where('dot', '==', registration.period),
-            limit(1),
-          );
-          const quotaSnap = await getDocs(quotaQuery);
-          if (!quotaSnap.empty) {
-            const quotaDoc = quotaSnap.docs[0];
+          const quotaSnap = await getDocs(collection(db, 'quota'));
+          const quotaDoc = quotaSnap.docs.find((docSnap) => {
+            const quotaData = docSnap.data();
+            const email = String(
+              quotaData.emailGV || quotaData.emailgv || quotaData.email || '',
+            )
+              .trim()
+              .toLowerCase();
+            return email === advisorEmailCandidate;
+          });
+          if (quotaDoc) {
             const quotaData = quotaDoc.data();
             const approved = Boolean(quotaData.approved);
-            const available = Number(quotaData.available ?? 0);
-            const usedSlot = Number(quotaData.usedSlot ?? 0);
-            if (!approved) {
-              throw new Error('Giảng viên chưa được TBM mở slot cho đợt này.');
+            const hasApprovedFlag = quotaData.approved !== undefined && quotaData.approved !== null;
+            const available = Number(quotaData.available ?? NaN);
+            const usedSlot = Number(quotaData.usedSlot ?? quotaData.usedslot ?? 0);
+            const maxSlot = Number(quotaData.maxSlot ?? quotaData.maxslot ?? quotaData.quota ?? 0);
+            if (hasApprovedFlag && !approved) {
+              throw new Error('Gi?ng vi?n ch?a ???c TBM m? slot cho ??t n?y.');
             }
-            if (available <= 0) {
-              throw new Error('Giảng viên đã hết slot hướng dẫn cho đợt này.');
+            if (Number.isFinite(available)) {
+              if (available <= 0) {
+                throw new Error('Gi?ng vi?n ?? h?t slot h??ng d?n cho ??t n?y.');
+              }
+              tx.update(quotaDoc.ref, {
+                available: available - 1,
+                usedSlot: usedSlot + 1,
+                updatedAt: serverTimestamp(),
+              });
+            } else if (maxSlot > 0) {
+              const advisorRegQuery = query(
+                regCollection,
+                where('advisorId', '==', registration.advisorId),
+                where('period', '==', registration.period),
+              );
+              const advisorRegSnap = await getDocs(advisorRegQuery);
+              const usedCount = advisorRegSnap.docs.filter(
+                (docSnap) => String(docSnap.data().status || '') !== 'advisor_rejected',
+              ).length;
+              if (usedCount >= maxSlot) {
+                throw new Error('Gi?ng vi?n ?? h?t slot h??ng d?n cho ??t n?y.');
+              }
             }
-            tx.update(quotaDoc.ref, {
-              available: available - 1,
-              usedSlot: usedSlot + 1,
-              updatedAt: serverTimestamp(),
-            });
           }
 
           const regRef = doc(collection(db, 'thesis_registrations'));

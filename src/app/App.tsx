@@ -1,6 +1,7 @@
 import { RouterProvider } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
+import { AlertToastBridge } from './components/AlertToastBridge';
 import { router } from './routes';
 
 export default function App() {
@@ -8,6 +9,7 @@ export default function App() {
     <AuthProvider>
       <DataProvider>
         <RouterProvider router={router} />
+        <AlertToastBridge />
       </DataProvider>
     </AuthProvider>
   );

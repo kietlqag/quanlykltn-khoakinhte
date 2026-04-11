@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { db } from '../../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { CheckCircle, X, Upload, Eye, Save, Users, Search } from 'lucide-react';
+import { CheckCircle, X, Upload, UploadCloud, Eye, Save, Users, Search, Download, Pencil } from 'lucide-react';
 import { CriteriaBreakdown } from '../../components/CriteriaBreakdown';
 
 interface Criterion {
@@ -22,6 +22,7 @@ export function TeacherAdvising() {
   const [searchQuery, setSearchQuery] = useState('');
   const [uploadingTurnitin, setUploadingTurnitin] = useState<string | null>(null);
   const [scoringFor, setScoringFor] = useState<string | null>(null);
+  const [viewingSubmissionRegId, setViewingSubmissionRegId] = useState<string | null>(null);
   const [criteriaScores, setCriteriaScores] = useState<Record<string, number>>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -240,23 +241,69 @@ export function TeacherAdvising() {
     }
   };
 
+  const setTurnitinFile = (file: File | null) => {
+    if (!file) return;
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      alert('Chỉ chấp nhận file PDF.');
+      return;
+    }
+    setSelectedFile(file);
+  };
+
+  const handleTurnitinDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0] || null;
+    setTurnitinFile(file);
+  };
+
   const handleSaveScore = (regId: string) => {
     const reg = myStudents.find((r) => r.id === regId);
     if (!reg) return;
     const criteria = reg.type === 'BCTT' ? criteriaByType.BCTT : criteriaByType.KLTN;
     const total = criteria.reduce((sum, c) => sum + (criteriaScores[c.id] || 0), 0);
+    const roundedScore = Number(total.toFixed(2));
+
     updateThesisRegistration(regId, {
       advisorCriteriaScores: criteriaScores,
-      advisorScore: Number(total.toFixed(2)),
+      advisorScore: roundedScore,
+      ...(reg.type === 'BCTT' && roundedScore >= 5 ? { status: 'completed' as const } : {}),
     });
     setScoringFor(null);
     setCriteriaScores({});
-    alert('Đã lưu điểm');
+    alert(
+      reg.type === 'BCTT' && roundedScore >= 5
+        ? '?? l?u ?i?m. Sinh vi?n ???c x?c nh?n ho?n th?nh BCTT.'
+        : '?? l?u ?i?m',
+    );
   };
 
   const handleMarkBcttPassed = (regId: string) => {
     updateThesisRegistration(regId, { status: 'completed' });
     alert('Đã xác nhận hoàn thành BCTT. Sinh viên có thể đăng ký KLTN.');
+  };
+
+  const triggerDownload = async (url?: string, fallbackName = 'download.pdf') => {
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Không tải được file.');
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fallbackName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error(error);
+      alert('Tải file thất bại, vui lòng thử lại.');
+    }
   };
 
   const pendingStudents = myStudents.filter((r) => r.status === 'pending');
@@ -288,8 +335,7 @@ export function TeacherAdvising() {
             className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
               activeTab === 'pending' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
             }`}
-          >
-            Chờ duyệt ({pendingStudents.length})
+          >{'\u0043\u0068\u1edd \u0064\u0075\u0079\u1ec7\u0074'} ({pendingStudents.length})
           </button>
           <button
             type="button"
@@ -297,8 +343,7 @@ export function TeacherAdvising() {
             className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
               activeTab === 'bctt' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
             }`}
-          >
-            Đang hướng dẫn BCTT ({advisingBcttStudents.length})
+          >{'\u0110\u0061\u006e\u0067 \u0068\u01b0\u1edb\u006e\u0067 \u0064\u1eab\u006e \u0042\u0043\u0054\u0054'} ({advisingBcttStudents.length})
           </button>
           <button
             type="button"
@@ -306,8 +351,7 @@ export function TeacherAdvising() {
             className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${
               activeTab === 'kltn' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
             }`}
-          >
-            Đang hướng dẫn KLTN ({advisingKltnStudents.length})
+          >{'\u0110\u0061\u006e\u0067 \u0068\u01b0\u1edb\u006e\u0067 \u0064\u1eab\u006e \u004b\u004c\u0054\u004e'} ({advisingKltnStudents.length})
           </button>
         </div>
 
@@ -319,7 +363,7 @@ export function TeacherAdvising() {
               setSearchQuery(e.target.value);
               setSelectedIds([]);
             }}
-            placeholder="Tìm MSSV, Tên, Đề tài..."
+            placeholder={'\u0054\u00ec\u006d \u004d\u0053\u0053\u0056\u002c \u0054\u00ea\u006e\u002c \u0110\u1ec1 \u0074\u00e0\u0069\u002e\u002e\u002e'}
             className="w-full pl-10 pr-3 py-2.5 rounded-full border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -335,7 +379,7 @@ export function TeacherAdvising() {
               className="px-4 py-2 bg-green-600 text-white rounded-full text-sm font-semibold hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CheckCircle className="w-4 h-4" />
-              Duyệt ({selectedIds.length})
+              {'\u0044\u0075\u0079\u1ec7\u0074'} ({selectedIds.length})
             </button>
             <button
               onClick={() => handleBulkApprove(false)}
@@ -343,7 +387,7 @@ export function TeacherAdvising() {
               className="px-4 py-2 bg-red-600 text-white rounded-full text-sm font-semibold hover:bg-red-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <X className="w-4 h-4" />
-              Từ chối ({selectedIds.length})
+              {'\u0054\u1eeb \u0063\u0068\u1ed1\u0069'} ({selectedIds.length})
             </button>
           </div>
 
@@ -360,10 +404,10 @@ export function TeacherAdvising() {
                   }
                 }}
               />
-              <span>Sinh viên</span>
+              <span>{'\u0053\u0069\u006e\u0068 \u0076\u0069\u00ea\u006e'}</span>
             </div>
-            <div className="col-span-5">Tên đề tài</div>
-            <div className="col-span-3 text-right">Hành động</div>
+            <div className="col-span-5">{'\u0054\u00ea\u006e \u0111\u1ec1 \u0074\u00e0\u0069'}</div>
+            <div className="col-span-3 text-right">{'\u0048\u00e0\u006e\u0068 \u0111\u1ed9\u006e\u0067'}</div>
           </div>
 
           <div className="divide-y divide-gray-200">
@@ -389,7 +433,7 @@ export function TeacherAdvising() {
                       </div>
                       <div className="mt-1 flex items-center gap-2 flex-wrap text-xs text-gray-500">
                         <span className="truncate">{reg.studentId}</span>
-                        <span>•</span>
+                        <span>â€¢</span>
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-700 font-medium rounded">{reg.type}</span>
                         <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-medium rounded">
                           {reg.period}
@@ -437,7 +481,7 @@ export function TeacherAdvising() {
                       onClick={() => handleEditTitle(reg)}
                       className="px-3 py-1.5 bg-blue-600 text-white rounded-full text-sm font-semibold hover:bg-blue-700"
                     >
-                      {editingTitle?.id === reg.id ? 'LƯU' : 'SỬA TÊN'}
+                      {editingTitle?.id === reg.id ? '\u004c\u01af\u0055' : '\u0053\u1eec\u0041 \u0054\u00ca\u004e'}
                     </button>
                   </div>
                 </div>
@@ -446,7 +490,7 @@ export function TeacherAdvising() {
 
             {filteredPendingStudents.length === 0 && (
               <div className="px-6 py-10 text-center text-sm text-gray-500">
-                Chưa có dữ liệu
+                {'\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0064\u1eef \u006c\u0069\u1ec7\u0075'}
               </div>
             )}
           </div>
@@ -458,21 +502,21 @@ export function TeacherAdvising() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
           {activeTab === 'kltn' ? (
             <div className="hidden md:grid md:grid-cols-[2fr_2.6fr_1.1fr_1.1fr_0.8fr_1.1fr_1.3fr] gap-4 px-6 py-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              <div>Sinh viên</div>
-              <div>Tên đề tài</div>
-              <div className="text-center">Bài làm</div>
+              <div>{'\u0053\u0069\u006e\u0068 \u0076\u0069\u00ea\u006e'}</div>
+              <div>{'\u0054\u00ea\u006e \u0111\u1ec1 \u0074\u00e0\u0069'}</div>
+              <div className="text-center">{'\u0042\u00e0\u0069 \u006c\u00e0\u006d'}</div>
               <div className="text-center">Turnitin</div>
-              <div className="text-center">Điểm</div>
-              <div className="text-center">Chỉnh sửa</div>
-              <div className="text-center">Biên bản hội đồng</div>
+              <div className="text-center">{'\u0110\u0069\u1ec3\u006d'}</div>
+              <div className="text-center">{'\u0043\u0068\u1ec9\u006e\u0068 \u0073\u1eeda'}</div>
+              <div className="text-center">{'\u0042\u0069\u00ea\u006e \u0062\u1ea3\u006e \u0068\u1ed9\u0069 \u0111\u1ed3\u006e\u0067'}</div>
             </div>
           ) : (
             <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              <div className="col-span-3">Sinh viên</div>
-              <div className="col-span-4">Tên đề tài</div>
-              <div className="col-span-2 text-center">Bài làm</div>
+              <div className="col-span-3">{'\u0053\u0069\u006e\u0068 \u0076\u0069\u00ea\u006e'}</div>
+              <div className="col-span-4">{'\u0054\u00ea\u006e \u0111\u1ec1 \u0074\u00e0\u0069'}</div>
+              <div className="col-span-2 text-center">{'\u0042\u00e0\u0069 \u006c\u00e0\u006d'}</div>
               <div className="col-span-2 text-center">Turnitin</div>
-              <div className="col-span-1 text-center">Điểm</div>
+              <div className="col-span-1 text-center">{'\u0110\u0069\u1ec3\u006d'}</div>
             </div>
           )}
 
@@ -500,11 +544,11 @@ export function TeacherAdvising() {
                   <div className={activeTab === 'kltn' ? 'md:text-center' : 'md:col-span-2 md:text-center'}>
                     {reg.pdfUrl ? (
                       <button
-                        onClick={() => window.open(reg.pdfUrl, '_blank', 'noopener,noreferrer')}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-200"
+                        onClick={() => setViewingSubmissionRegId(reg.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:opacity-90"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        Xem bài
+                        {'\u0058\u0065\u006d \u0062\u00e0\u0069'}
                       </button>
                     ) : (
                       <span className="text-sm text-gray-400">-</span>
@@ -529,19 +573,22 @@ export function TeacherAdvising() {
                         className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-100 rounded-lg text-xs font-medium text-indigo-700 hover:bg-indigo-200"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        Tải lên
+                        {'\u0054\u1ea3\u0069 \u006c\u00ea\u006e'}
                       </button>
                     )}
                   </div>
 
                   <div className={activeTab === 'kltn' ? 'md:text-center' : 'md:col-span-1 md:text-center'}>
-                    <span
-                      className={`inline-flex items-center justify-center min-w-8 px-2 py-1 rounded-full text-xs font-bold ${
-                        reg.advisorScore ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                      }`}
-                    >
-                      {reg.advisorScore ?? 0}
-                    </span>
+                    {typeof reg.advisorScore === 'number' ? (
+                      <span className="inline-flex items-center justify-center min-w-8 rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
+                        {reg.advisorScore}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                        <Pencil className="h-3.5 w-3.5" />
+                        {'\u0043\u0068\u1ea5\u006d \u0111\u0069\u1ec3\u006d'}
+                      </span>
+                    )}
                   </div>
 
                   {activeTab === 'kltn' && (
@@ -552,7 +599,7 @@ export function TeacherAdvising() {
                             reg.revisionExplanationUrl &&
                             window.open(reg.revisionExplanationUrl, '_blank', 'noopener,noreferrer')
                           }
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-200"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:opacity-90"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           Xem
@@ -571,7 +618,7 @@ export function TeacherAdvising() {
                             reg.councilMinutesUrl &&
                             window.open(reg.councilMinutesUrl, '_blank', 'noopener,noreferrer')
                           }
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-200"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:opacity-90"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           Xem
@@ -587,9 +634,101 @@ export function TeacherAdvising() {
 
             {filteredAdvisingStudents.length === 0 && (
               <div className="px-6 py-10 text-center text-sm text-gray-500">
-                Chưa có dữ liệu
+                {'\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0064\u1eef \u006c\u0069\u1ec7\u0075'}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {viewingSubmissionRegId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {(() => {
+              const activeReg = myStudents.find((item) => item.id === viewingSubmissionRegId);
+              if (!activeReg) return null;
+              return (
+                <>
+                  <div className="flex items-start justify-between border-b border-gray-200 px-6 py-5">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">{'\u0058\u0065\u006d \u0068\u1ed3 \u0073\u01a1 \u0062\u00e0\u0069 \u006e\u1ed9\u0070'}</h2>
+                      <p className="mt-1 text-sm text-gray-600">{activeReg.title}</p>
+                    </div>
+                    <button
+                      onClick={() => setViewingSubmissionRegId(null)}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="grid gap-4 px-6 py-6 md:grid-cols-2">
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                      <p className="text-sm font-semibold text-gray-900">{'\u0042\u00e0\u0069 \u006c\u00e0\u006d \u0042\u0043\u0054\u0054 \u0028\u0050\u0044\u0046\u0029'}</p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() =>
+                            activeReg.pdfUrl &&
+                            window.open(activeReg.pdfUrl, '_blank', 'noopener,noreferrer')
+                          }
+                          disabled={!activeReg.pdfUrl}
+                          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Xem file
+                        </button>
+                        {activeReg.pdfUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => triggerDownload(activeReg.pdfUrl, `${activeReg.studentId}-bao-cao-bctt.pdf`)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {'\u0054\u1ea3\u0069 \u0076\u1ec1'}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-500">{'\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0066\u0069\u006c\u0065'}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+                      <p className="text-sm font-semibold text-gray-900">{'\u0050\u0068\u0069\u1ebf\u0075 \u0078\u00e1\u0063 \u006e\u0068\u1ead\u006e \u0063\u00f4\u006e\u0067 \u0074\u0079 \u0028\u0050\u0044\u0046\u0029'}</p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() =>
+                            activeReg.internshipCertUrl &&
+                            window.open(activeReg.internshipCertUrl, '_blank', 'noopener,noreferrer')
+                          }
+                          disabled={!activeReg.internshipCertUrl}
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Xem file
+                        </button>
+                        {activeReg.internshipCertUrl ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              triggerDownload(
+                                activeReg.internshipCertUrl,
+                                `${activeReg.studentId}-phieu-xac-nhan-cong-ty.pdf`,
+                              )
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {'\u0054\u1ea3\u0069 \u0076\u1ec1'}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-500">{'\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0066\u0069\u006c\u0065'}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -622,23 +761,34 @@ export function TeacherAdvising() {
                   </div>
 
                   <div className="px-6 py-6">
-                    <label className="block rounded-2xl border border-blue-200 bg-blue-50/70 p-5">
-                      <div className="mb-4 flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100">
-                          <Upload className="h-5 w-5 text-blue-600" />
-                        </div>
+                    <input
+                      id="upload-turnitin-pdf"
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={(e) => setTurnitinFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="upload-turnitin-pdf"
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={handleTurnitinDrop}
+                      className="block cursor-pointer rounded-2xl border border-blue-200 bg-blue-50/70 p-5 transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                      <div className="mb-4">
                         <div>
                           <p className="font-medium text-gray-900">File Turnitin (PDF)</p>
-                          <p className="text-sm text-gray-600">Tải lên báo cáo Turnitin của sinh viên</p>
+                          <p className="text-sm text-gray-600">{'\u0054\u1ea3\u0069 \u006c\u00ea\u006e \u0062\u00e1\u006f \u0063\u00e1\u006f \u0054\u0075\u0072\u006e\u0069\u0074\u0069\u006e \u0063\u1ee7\u0061 \u0073\u0069\u006e\u0068 \u0076\u0069\u00ea\u006e'}</p>
                         </div>
                       </div>
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                        className="block w-full text-sm text-gray-600 file:mr-4 file:rounded-xl file:border-0 file:bg-blue-600 file:px-4 file:py-2.5 file:font-medium file:text-white hover:file:bg-blue-700"
-                      />
-                      {selectedFile && <p className="mt-3 text-sm text-gray-700">{selectedFile.name}</p>}
+                      <div className="flex items-center gap-3 rounded-xl border border-dashed border-blue-300 bg-white/80 px-4 py-3">
+                        <UploadCloud className="h-5 w-5 text-blue-600" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-blue-700">{'\u004e\u0068\u1ea5\u006e \u0068\u006f\u1eb7\u0063 \u006b\u00e9\u006f \u0074\u0068\u1ea3 \u0066\u0069\u006c\u0065 \u0076\u00e0\u006f \u0111\u00e2\u0079'}</p>
+                          <p className="truncate text-xs text-gray-600">
+                            {selectedFile?.name || '\u0043\u0068\u01b0\u0061 \u0063\u0068\u1ecdn \u0066\u0069\u006c\u0065'}
+                          </p>
+                        </div>
+                      </div>
                     </label>
                   </div>
 
@@ -646,7 +796,7 @@ export function TeacherAdvising() {
                     <div className="px-6 pb-2">
                       <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
                         <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="font-medium text-blue-900">{uploadMessage || 'Đang upload...'}</span>
+                          <span className="font-medium text-blue-900">{uploadMessage || '\u0110ang upload...'}</span>
                           <span className="text-blue-700">{uploadProgress ?? 0}%</span>
                         </div>
                         <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-100">
@@ -669,14 +819,14 @@ export function TeacherAdvising() {
                       disabled={isUploading}
                       className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
                     >
-                      Hủy
+                      {'\u0048\u1ee7\u0079'}
                     </button>
                     <button
                       onClick={() => handleUploadTurnitin(activeReg.id)}
                       disabled={!selectedFile || isUploading}
                       className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                     >
-                      {isUploading ? 'Đang upload...' : 'Xác nhận upload'}
+                      {isUploading ? '\u0110ang upload...' : '\u0058\u00e1\u0063 \u006e\u0068\u1ead\u006e upload'}
                     </button>
                   </div>
                 </>
