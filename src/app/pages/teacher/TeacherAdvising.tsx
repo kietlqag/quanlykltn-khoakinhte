@@ -1,17 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { db } from '../../../lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { CheckCircle, X, Upload, UploadCloud, Eye, Save, Users, Search, Download, Pencil } from 'lucide-react';
-import { CriteriaBreakdown } from '../../components/CriteriaBreakdown';
+import { BookOpen, CheckCircle, X, Upload, UploadCloud, Eye, Save, Users, Search, Download, Pencil, Settings } from 'lucide-react';
 
-interface Criterion {
-  id: string;
-  label: string;
-  description: string;
-  maxScore: number;
-}
+const ADVISOR_APP_CRITERIA = [
+  { id: 'c1', label: '1. Đặt vấn đề - Lý do chọn đề tài', maxScore: 1 },
+  { id: 'c2', label: '2. Nội dung - Cơ sở lý thuyết', maxScore: 1 },
+  { id: 'c3', label: '3. Nội dung - Phân tích, đánh giá', maxScore: 2 },
+  { id: 'c4', label: '4. Nội dung - Giải pháp', maxScore: 2 },
+  { id: 'c5', label: '5. Hình thức - Cấu trúc, câu văn và từ ngữ', maxScore: 2 },
+  { id: 'c6', label: '6. Hình thức - Trích dẫn và tài liệu tham khảo', maxScore: 1 },
+  { id: 'c7', label: '7. Thái độ', maxScore: 1 },
+  { id: 'c8', label: '8. Điểm cộng (Tiếng Anh/Bài báo khoa học)', maxScore: 2 },
+] as const;
+const ADVISOR_RESEARCH_CRITERIA = [
+  { id: 'r1', label: '1. Tổng quan luận văn - Giới thiệu', maxScore: 1 },
+  { id: 'r2', label: '2. Cơ sở lý thuyết - Lược khảo và mô hình nghiên cứu', maxScore: 2 },
+  { id: 'r3', label: '3. Phương pháp nghiên cứu', maxScore: 1 },
+  { id: 'r4', label: '4. Kết quả nghiên cứu và thảo luận', maxScore: 2 },
+  { id: 'r5', label: '5. Kết luận và hàm ý quản trị (chính sách)', maxScore: 1 },
+  { id: 'r6', label: '6. Hình thức - Trích dẫn và tài liệu tham khảo', maxScore: 2 },
+  { id: 'r7', label: '7. Tính sáng tạo - tính mới', maxScore: 1 },
+  { id: 'r8', label: '8. Điểm cộng (Tiếng Anh/Bài báo khoa học)', maxScore: 2 },
+] as const;
 
 export function TeacherAdvising() {
   const { user } = useAuth();
@@ -22,18 +33,19 @@ export function TeacherAdvising() {
   const [searchQuery, setSearchQuery] = useState('');
   const [uploadingTurnitin, setUploadingTurnitin] = useState<string | null>(null);
   const [scoringFor, setScoringFor] = useState<string | null>(null);
+  const [scoreTypePickerFor, setScoreTypePickerFor] = useState<string | null>(null);
+  const [advisorAppScoreFor, setAdvisorAppScoreFor] = useState<string | null>(null);
+  const [advisorRubricType, setAdvisorRubricType] = useState<'ung_dung' | 'nghien_cuu'>('ung_dung');
+  const [advisorAppScores, setAdvisorAppScores] = useState<Record<string, number>>({});
+  const [advisorAppComments, setAdvisorAppComments] = useState('');
+  const [scoreDraft, setScoreDraft] = useState('');
   const [viewingSubmissionRegId, setViewingSubmissionRegId] = useState<string | null>(null);
-  const [criteriaScores, setCriteriaScores] = useState<Record<string, number>>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadMessage, setUploadMessage] = useState('');
   const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-  const [criteriaByType, setCriteriaByType] = useState<{ BCTT: Criterion[]; KLTN: Criterion[] }>({
-    BCTT: [],
-    KLTN: [],
-  });
 
   const myStudents = thesisRegistrations.filter((r) => r.advisorId === user?.id);
 
@@ -59,33 +71,6 @@ export function TeacherAdvising() {
       .toLowerCase();
     return haystack.includes(q);
   };
-
-  useEffect(() => {
-    const toCriteria = (docs: any[]): Criterion[] =>
-      docs.map((d) => {
-        const x = d.data();
-        return {
-          id: d.id,
-          label: String(x.tieuchitc || x.noidungdanhgia || `Tiêu chí ${x.stt || ''}`).trim(),
-          description: String(
-            x.motachitiet || x.dauhieudanhgiagoiycham || x.tukhoadauhieudanhgia || '',
-          ).trim(),
-          maxScore: Math.max(0.5, Number(x.diemtoida || 1)),
-        };
-      });
-
-    const unsubBCTT = onSnapshot(collection(db, 'bb_gvhd_bctt'), (snap) =>
-      setCriteriaByType((prev) => ({ ...prev, BCTT: toCriteria(snap.docs) })),
-    );
-    const unsubKLTN = onSnapshot(collection(db, 'bb_gvhd_kltn'), (snap) =>
-      setCriteriaByType((prev) => ({ ...prev, KLTN: toCriteria(snap.docs) })),
-    );
-
-    return () => {
-      unsubBCTT();
-      unsubKLTN();
-    };
-  }, []);
 
   const handleBulkApprove = (approve: boolean) => {
     selectedIds.forEach((id) => {
@@ -257,30 +242,68 @@ export function TeacherAdvising() {
     setTurnitinFile(file);
   };
 
-  const handleSaveScore = (regId: string) => {
+  const handleSaveScore = (regId: string, rawScore: string) => {
     const reg = myStudents.find((r) => r.id === regId);
     if (!reg) return;
-    const criteria = reg.type === 'BCTT' ? criteriaByType.BCTT : criteriaByType.KLTN;
-    const total = criteria.reduce((sum, c) => sum + (criteriaScores[c.id] || 0), 0);
-    const roundedScore = Number(total.toFixed(2));
+
+    const parsed = Number(rawScore);
+    if (!Number.isFinite(parsed)) {
+      alert('Vui lòng nhập điểm hợp lệ.');
+      return;
+    }
+    if (parsed < 0 || parsed > 10) {
+      alert('Điểm phải trong khoảng 0 đến 10.');
+      return;
+    }
+    const roundedScore = Number(parsed.toFixed(2));
 
     updateThesisRegistration(regId, {
-      advisorCriteriaScores: criteriaScores,
       advisorScore: roundedScore,
       ...(reg.type === 'BCTT' && roundedScore >= 5 ? { status: 'completed' as const } : {}),
     });
     setScoringFor(null);
-    setCriteriaScores({});
+    setScoreDraft('');
     alert(
       reg.type === 'BCTT' && roundedScore >= 5
-        ? '?? l?u ?i?m. Sinh vi?n ???c x?c nh?n ho?n th?nh BCTT.'
-        : '?? l?u ?i?m',
+        ? '\u0110\u00e3 l\u01b0u \u0111i\u1ec3m. Sinh vi\u00ean \u0111\u01b0\u1ee3c x\u00e1c nh\u1eadn ho\u00e0n th\u00e0nh BCTT.'
+        : '\u0110\u00e3 l\u01b0u \u0111i\u1ec3m',
     );
+  };
+
+  const handleOpenScoreTypePicker = (regId: string) => {
+    setScoreTypePickerFor(regId);
+  };
+
+  const handlePickTopicType = (_topicType: 'ung_dung' | 'nghien_cuu') => {
+    if (!scoreTypePickerFor) return;
+    const reg = myStudents.find((r) => r.id === scoreTypePickerFor);
+    setAdvisorRubricType(_topicType);
+    setAdvisorAppScores((reg?.advisorCriteriaScores as Record<string, number>) || {});
+    setAdvisorAppComments(reg?.advisorComments || '');
+    setAdvisorAppScoreFor(scoreTypePickerFor);
+    setScoreTypePickerFor(null);
+  };
+
+  const handleSaveAdvisorAppScore = (regId: string) => {
+    const criteria =
+      advisorRubricType === 'nghien_cuu' ? ADVISOR_RESEARCH_CRITERIA : ADVISOR_APP_CRITERIA;
+    const total = Number(
+      criteria.reduce((sum, c) => sum + (advisorAppScores[c.id] || 0), 0).toFixed(2),
+    );
+    updateThesisRegistration(regId, {
+      advisorScore: total,
+      advisorCriteriaScores: advisorAppScores,
+      advisorComments: advisorAppComments.trim() || undefined,
+    });
+    setAdvisorAppScoreFor(null);
+    setAdvisorAppScores({});
+    setAdvisorAppComments('');
+    alert('Đã lưu điểm');
   };
 
   const handleMarkBcttPassed = (regId: string) => {
     updateThesisRegistration(regId, { status: 'completed' });
-    alert('Đã xác nhận hoàn thành BCTT. Sinh viên có thể đăng ký KLTN.');
+    alert('\u0110\u00e3 x\u00e1c nh\u1eadn ho\u00e0n th\u00e0nh BCTT. Sinh vi\u00ean c\u00f3 th\u1ec3 \u0111\u0103ng k\u00fd KLTN.');
   };
 
   const triggerDownload = async (url?: string, fallbackName = 'download.pdf') => {
@@ -322,8 +345,6 @@ export function TeacherAdvising() {
   const filteredAdvisingKltnStudents = advisingKltnStudents.filter(matchesSearch);
   const filteredAdvisingStudents =
     activeTab === 'bctt' ? filteredAdvisingBcttStudents : filteredAdvisingKltnStudents;
-  const getCriteriaForType = (type: 'BCTT' | 'KLTN') =>
-    type === 'BCTT' ? criteriaByType.BCTT : criteriaByType.KLTN;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -583,11 +604,54 @@ export function TeacherAdvising() {
                       <span className="inline-flex items-center justify-center min-w-8 rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
                         {reg.advisorScore}
                       </span>
+                    ) : scoringFor === reg.id ? (
+                      <div className="inline-flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={10}
+                          step={0.1}
+                          value={scoreDraft}
+                          onChange={(e) => setScoreDraft(e.target.value)}
+                          className="w-16 rounded-lg border border-gray-300 px-2 py-1 text-xs focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                          placeholder="0-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveScore(reg.id, scoreDraft)}
+                          className="inline-flex items-center rounded-md bg-blue-600 p-1 text-white hover:bg-blue-700"
+                          title="Lưu điểm"
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScoringFor(null);
+                            setScoreDraft('');
+                          }}
+                          className="inline-flex items-center rounded-md bg-gray-200 p-1 text-gray-700 hover:bg-gray-300"
+                          title="Hủy"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (reg.type === 'KLTN') {
+                            handleOpenScoreTypePicker(reg.id);
+                            return;
+                          }
+                          setScoringFor(reg.id);
+                          setScoreDraft('');
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-200"
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                         {'\u0043\u0068\u1ea5\u006d \u0111\u0069\u1ec3\u006d'}
-                      </span>
+                      </button>
                     )}
                   </div>
 
@@ -692,39 +756,41 @@ export function TeacherAdvising() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-                      <p className="text-sm font-semibold text-gray-900">{'\u0050\u0068\u0069\u1ebf\u0075 \u0078\u00e1\u0063 \u006e\u0068\u1ead\u006e \u0063\u00f4\u006e\u0067 \u0074\u0079 \u0028\u0050\u0044\u0046\u0029'}</p>
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() =>
-                            activeReg.internshipCertUrl &&
-                            window.open(activeReg.internshipCertUrl, '_blank', 'noopener,noreferrer')
-                          }
-                          disabled={!activeReg.internshipCertUrl}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Xem file
-                        </button>
-                        {activeReg.internshipCertUrl ? (
+                    {activeReg.type === 'BCTT' && (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+                        <p className="text-sm font-semibold text-gray-900">{'\u0050\u0068\u0069\u1ebf\u0075 \u0078\u00e1\u0063 \u006e\u0068\u1ead\u006e \u0063\u00f4\u006e\u0067 \u0074\u0079 \u0028\u0050\u0044\u0046\u0029'}</p>
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
                           <button
-                            type="button"
                             onClick={() =>
-                              triggerDownload(
-                                activeReg.internshipCertUrl,
-                                `${activeReg.studentId}-phieu-xac-nhan-cong-ty.pdf`,
-                              )
+                              activeReg.internshipCertUrl &&
+                              window.open(activeReg.internshipCertUrl, '_blank', 'noopener,noreferrer')
                             }
-                            className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
+                            disabled={!activeReg.internshipCertUrl}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
                           >
-                            <Download className="h-3.5 w-3.5" />
-                            {'\u0054\u1ea3\u0069 \u0076\u1ec1'}
+                            <Eye className="h-3.5 w-3.5" />
+                            Xem file
                           </button>
-                        ) : (
-                          <span className="text-xs text-gray-500">{'\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0066\u0069\u006c\u0065'}</span>
-                        )}
+                          {activeReg.internshipCertUrl ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                triggerDownload(
+                                  activeReg.internshipCertUrl,
+                                  `${activeReg.studentId}-phieu-xac-nhan-cong-ty.pdf`,
+                                )
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {'\u0054\u1ea3\u0069 \u0076\u1ec1'}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-500">{'\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0066\u0069\u006c\u0065'}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </>
               );
@@ -832,6 +898,133 @@ export function TeacherAdvising() {
                 </>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {scoreTypePickerFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-blue-700 px-6 py-4 text-white">
+              <h3 className="text-2xl font-bold">CHỌN LOẠI ĐỀ TÀI</h3>
+              <button
+                type="button"
+                onClick={() => setScoreTypePickerFor(null)}
+                className="rounded-lg p-1.5 hover:bg-blue-600"
+              >
+                <X className="h-7 w-7" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 p-6 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => handlePickTopicType('ung_dung')}
+                className="rounded-2xl border-2 border-dashed border-slate-300 p-6 text-center transition hover:border-blue-400 hover:bg-blue-50"
+              >
+                <span className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                  <Settings className="h-7 w-7" />
+                </span>
+                <p className="font-semibold text-slate-900">ĐỀ TÀI ỨNG DỤNG</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePickTopicType('nghien_cuu')}
+                className="rounded-2xl border-2 border-dashed border-slate-300 p-6 text-center transition hover:border-blue-400 hover:bg-blue-50"
+              >
+                <span className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                  <BookOpen className="h-7 w-7" />
+                </span>
+                <p className="font-semibold text-slate-900">ĐỀ TÀI NGHIÊN CỨU</p>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {advisorAppScoreFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="shrink-0 bg-blue-700 px-6 py-4 text-center text-white">
+              <h3 className="text-xl font-bold">BIÊN BẢN CHẤM ĐIỂM</h3>
+              <p className="text-lg font-semibold">GIÁO VIÊN HƯỚNG DẪN</p>
+            </div>
+
+            <div className="overflow-y-auto p-5">
+              <div className="mb-2 grid grid-cols-[1fr_80px_120px] gap-3 text-center font-semibold text-gray-800">
+                <div />
+                <div>TỐI ĐA</div>
+                <div>ĐIỂM</div>
+              </div>
+              <div className="space-y-2">
+                {(advisorRubricType === 'nghien_cuu' ? ADVISOR_RESEARCH_CRITERIA : ADVISOR_APP_CRITERIA).map((criterion) => (
+                  <div key={criterion.id} className="grid grid-cols-[1fr_80px_120px] items-center gap-3">
+                    <div className="rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-900">
+                      {criterion.label}
+                    </div>
+                    <div className="mx-auto inline-flex min-w-9 items-center justify-center rounded-full bg-gray-200 px-3 py-1 font-bold text-gray-700">
+                      {criterion.maxScore}
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      max={criterion.maxScore}
+                      step={0.1}
+                      value={advisorAppScores[criterion.id] ?? 0}
+                      onChange={(e) =>
+                        setAdvisorAppScores((prev) => ({
+                          ...prev,
+                          [criterion.id]: Math.max(
+                            0,
+                            Math.min(criterion.maxScore, Number(e.target.value || 0)),
+                          ),
+                        }))
+                      }
+                      className="w-full rounded-full border border-blue-200 bg-blue-100 px-3 py-1.5 text-center font-semibold text-gray-800"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5">
+                <label className="mb-2 block text-sm font-semibold text-gray-800">
+                  Nhận xét và câu hỏi (nếu có)
+                </label>
+                <textarea
+                  value={advisorAppComments}
+                  onChange={(e) => setAdvisorAppComments(e.target.value)}
+                  rows={4}
+                  placeholder="Nhập nhận xét hoặc câu hỏi cho sinh viên..."
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+
+              <div className="sticky bottom-0 mt-6 flex items-center justify-end gap-3 border-t border-gray-200 bg-white pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdvisorAppScoreFor(null);
+                    setAdvisorAppScores({});
+                    setAdvisorAppComments('');
+                  }}
+                  aria-label="Quay lại"
+                  title="Quay lại"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-gray-300 text-gray-700 hover:bg-gray-400"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveAdvisorAppScore(advisorAppScoreFor)}
+                  aria-label="Lưu"
+                  title="Lưu"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  <Save className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -9,6 +9,7 @@ export interface User {
   email: string;
   faculty?: string;
   expertise?: string[];
+  heDaoTao?: string;
   quota?: number;
 }
 
@@ -40,6 +41,7 @@ export interface ThesisRegistration {
   revisionExplanationUrl?: string;
   advisorApprovalRevision?: boolean;
   chairmanApprovalRevision?: boolean;
+  advisorComments?: string;
   reviewerComments?: string;
   councilComments?: string;
   submissionDeadline?: string;
@@ -55,6 +57,8 @@ export interface Council {
   secretaryId: string;
   members: string[];
   period: string;
+  location?: string;
+  time?: string;
 }
 
 // Mock users

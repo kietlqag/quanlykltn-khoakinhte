@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   ThesisRegistration,
   Council,
@@ -16,6 +16,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  deleteDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -30,6 +31,7 @@ interface DataContextType {
   updateUser: (id: string, updates: Partial<User>) => void;
   addCouncil: (council: Council) => void;
   updateCouncil: (id: string, updates: Partial<Council>) => void;
+  deleteCouncil: (id: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -52,7 +54,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const raw = String(value || '').trim().toLowerCase();
       if (!raw) return 'pending';
       if (
-        raw.includes('không') ||
+        raw.includes('khÃ´ng') ||
         raw.includes('tu choi') ||
         raw.includes('rejected') ||
         raw.includes('reject')
@@ -62,7 +64,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (raw.includes('cho') && raw.includes('duyet')) return 'pending';
       if (
         raw.includes('duyet') ||
-        raw.includes('đồng ý') ||
+        raw.includes('Ä‘á»“ng Ã½') ||
         raw.includes('dong y') ||
         raw.includes('approved') ||
         raw === 'yes'
@@ -76,7 +78,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (
         raw.includes('submitted') ||
         raw.includes('da nop') ||
-        raw.includes('nộp') ||
+        raw.includes('ná»™p') ||
         raw.includes('nop')
       )
         return 'submitted';
@@ -90,6 +92,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const mappedUsers: User[] = snapshot.docs.map((d) => {
         const data = d.data();
         const major = String(data.major || '').trim();
+        const heDaoTao = String(data.heDaoTao || data.hedaotao || '').trim();
         return {
           id: d.id,
           username: String(data.email || '').trim().toLowerCase(),
@@ -99,6 +102,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           email: String(data.email || '').trim().toLowerCase(),
           faculty: String(data.faculty || '').trim() || undefined,
           expertise: major ? [major] : [],
+          heDaoTao: heDaoTao || undefined,
           quota: typeof data.quota === 'number' ? data.quota : undefined,
         };
       });
@@ -116,6 +120,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           secretaryId: String(data.secretaryId || ''),
           members: Array.isArray(data.members) ? data.members.map(String) : [],
           period: String(data.period || ''),
+          location: String(data.location || '') || undefined,
+          time: String(data.time || '') || undefined,
         };
       });
       setCouncils(mappedCouncils);
@@ -164,6 +170,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               typeof data.chairmanApprovalRevision === 'boolean'
                 ? data.chairmanApprovalRevision
                 : undefined,
+            advisorComments: String(data.advisorComments || '') || undefined,
             reviewerComments: String(data.reviewerComments || '') || undefined,
             councilComments: String(data.councilComments || '') || undefined,
             submissionDeadline: String(data.submissionDeadline || '') || undefined,
@@ -307,7 +314,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           );
           const existedReg = await getDocs(existedRegQuery);
           if (!existedReg.empty) {
-            throw new Error(`Bạn đã đăng ký ${registration.type} rồi.`);
+            throw new Error(`Báº¡n Ä‘Ã£ Ä‘Äƒng kÃ½ ${registration.type} rá»“i.`);
           }
 
           if (registration.type === 'KLTN') {
@@ -320,7 +327,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             );
             const bcttDone = await getDocs(bcttQuery);
             if (bcttDone.empty) {
-              throw new Error('Bạn cần hoàn thành BCTT trước khi đăng ký KLTN.');
+              throw new Error('Báº¡n cáº§n hoÃ n thÃ nh BCTT trÆ°á»›c khi Ä‘Äƒng kÃ½ KLTN.');
             }
           }
           const quotaSnap = await getDocs(collection(db, 'quota'));
@@ -369,8 +376,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           }
 
           const regRef = doc(collection(db, 'thesis_registrations'));
+          const cleanRegistration = Object.fromEntries(
+            Object.entries(registration).filter(([, value]) => value !== undefined),
+          );
+
           tx.set(regRef, {
-            ...registration,
+            ...cleanRegistration,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -418,7 +429,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           const ref = doc(db, 'thesis_registrations', id);
           const snap = await tx.get(ref);
           if (!snap.exists()) {
-            throw new Error('Không tìm thấy hồ sơ đăng ký.');
+            throw new Error('KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ Ä‘Äƒng kÃ½.');
           }
           const current = snap.data() as ThesisRegistration;
           if (
@@ -426,7 +437,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             updates.advisorApprovalRevision !== true &&
             current.advisorApprovalRevision !== true
           ) {
-            throw new Error('Chủ tịch chỉ được duyệt sau khi GVHD đã duyệt.');
+            throw new Error('Chá»§ tá»‹ch chá»‰ Ä‘Æ°á»£c duyá»‡t sau khi GVHD Ä‘Ã£ duyá»‡t.');
           }
 
           tx.update(ref, {
@@ -488,6 +499,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (typeof updates.fullName === 'string') payload.name = updates.fullName;
     if (typeof updates.email === 'string') payload.email = updates.email;
     if (typeof updates.faculty === 'string') payload.faculty = updates.faculty;
+    if (typeof updates.heDaoTao === 'string') payload.heDaoTao = updates.heDaoTao;
     if (Array.isArray(updates.expertise)) payload.expertise = updates.expertise;
     if (typeof updates.quota === 'number') payload.quota = updates.quota;
     payload.updatedAt = serverTimestamp();
@@ -520,6 +532,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }).catch((error) => console.error('Update council failed:', error));
   };
 
+  const deleteCouncil = (id: string) => {
+    void deleteDoc(doc(db, 'councils', id)).catch((error) =>
+      console.error('Delete council failed:', error),
+    );
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -531,6 +549,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updateUser,
         addCouncil,
         updateCouncil,
+        deleteCouncil,
       }}
     >
       {children}
@@ -545,3 +564,4 @@ export function useData() {
   }
   return context;
 }
+

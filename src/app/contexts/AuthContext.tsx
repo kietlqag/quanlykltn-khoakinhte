@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fullName = String(data.name ?? data.ten ?? '').trim();
     const faculty = String(data.faculty ?? data.khoa ?? '').trim();
     const major = String(data.major ?? '').trim();
+    const heDaoTao = String(data.heDaoTao ?? data.hedaotao ?? '').trim();
     const role = normalizeRole(String(data.role ?? 'SV'));
     const quotaValue = data.quota;
 
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       faculty: faculty || undefined,
       expertise: major ? [major] : [],
+      heDaoTao: heDaoTao || undefined,
       quota: typeof quotaValue === 'number' ? quotaValue : undefined,
     };
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { collection, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
@@ -69,46 +69,58 @@ export function TbmAssignReviewer() {
               </tr>
             </thead>
             <tbody>
-              {approvedRegistrations.map((reg) => (
-                <tr key={reg.id} className="border-b border-gray-100 hover:bg-gray-50 align-top">
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-gray-900">{getStudentName(reg.studentId)}</div>
-                    <div className="text-gray-500">{reg.studentId}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900 leading-5">{reg.title}</div>
-                  </td>
-                  <td className="px-4 py-3 text-blue-700">{reg.field || '-'}</td>
-                  <td className="px-4 py-3 text-gray-700">{reg.period || '-'}</td>
-                  <td className="px-4 py-3 text-gray-800">{getAdvisorName(reg.advisorId)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={assignments[reg.id] || reg.reviewerId || ''}
-                        onChange={(e) => setAssignments({ ...assignments, [reg.id]: e.target.value })}
-                        className="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                      >
-                        <option value="">Chọn GV phản biện</option>
-                        {teachers
-                          .filter((t) => t.id !== reg.advisorId)
-                          .map((teacher) => (
-                            <option key={teacher.id} value={teacher.id}>
-                              {teacher.fullName}
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => handleAssign(reg.id)}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 inline-flex items-center gap-1 shrink-0"
-                      >
-                        <Save className="w-4 h-4" />
-                        Lưu
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {approvedRegistrations.map((reg) => {
+                const isAssigned = !!reg.reviewerId;
+
+                return (
+                  <tr key={reg.id} className="border-b border-gray-100 hover:bg-gray-50 align-top">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">{getStudentName(reg.studentId)}</div>
+                      <div className="text-gray-500">{reg.studentId}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900 leading-5">{reg.title}</div>
+                    </td>
+                    <td className="px-4 py-3 text-blue-700">{reg.field || '-'}</td>
+                    <td className="px-4 py-3 text-gray-700">{reg.period || '-'}</td>
+                    <td className="px-4 py-3 text-gray-800">{getAdvisorName(reg.advisorId)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={assignments[reg.id] || reg.reviewerId || ''}
+                          onChange={(e) => setAssignments({ ...assignments, [reg.id]: e.target.value })}
+                          disabled={isAssigned}
+                          className="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500"
+                        >
+                          <option value="">Chọn GV phản biện</option>
+                          {teachers
+                            .filter((t) => t.id !== reg.advisorId)
+                            .map((teacher) => (
+                              <option key={teacher.id} value={teacher.id}>
+                                {teacher.fullName}
+                              </option>
+                            ))}
+                        </select>
+
+                        {!isAssigned ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAssign(reg.id)}
+                            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 inline-flex items-center gap-1 shrink-0"
+                          >
+                            <Save className="w-4 h-4" />
+                            Lưu
+                          </button>
+                        ) : (
+                          <span className="px-2.5 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-semibold shrink-0">
+                            Đã phân công
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {approvedRegistrations.length === 0 && (
                 <tr>

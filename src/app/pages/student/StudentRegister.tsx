@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -8,12 +9,14 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 type FieldRow = {
   email: string;
   major: string;
+  heDaoTao: string;
   field: string;
 };
 
 type QuotaRow = {
   emailGV: string;
   dot: string;
+  heDaoTao: string;
   available: number;
   maxSlot: number;
   approved: boolean;
@@ -22,6 +25,7 @@ type QuotaRow = {
 };
 
 export function StudentRegister() {
+  const location = useLocation() as { state?: { defaultType?: 'BCTT' | 'KLTN' } };
   const { user } = useAuth();
   const { thesisRegistrations, users, addThesisRegistration } = useData();
 
@@ -47,6 +51,8 @@ export function StudentRegister() {
 
   const currentStudentMajor =
     users.find((u) => u.id === user?.id)?.expertise?.[0] || user?.expertise?.[0] || '';
+  const currentStudentHeDaoTao =
+    users.find((u) => u.id === user?.id)?.heDaoTao || user?.heDaoTao || '';
 
   const normalizeText = (value: string) =>
     String(value || '')
@@ -131,6 +137,7 @@ export function StudentRegister() {
             .trim()
             .toLowerCase(),
           major: String(data.major || data.nganh || '').trim(),
+          heDaoTao: String(data.heDaoTao || data.hedaotao || data.he || '').trim(),
           field: String(data.field || data.linhVuc || '').trim(),
         };
       });
@@ -138,12 +145,16 @@ export function StudentRegister() {
       setFieldMappings(rows);
 
       const normalizedMajor = normalizeText(currentStudentMajor);
+      const normalizedHeDaoTao = normalizeText(currentStudentHeDaoTao);
       const filtered = rows
         .filter((row) => row.field)
         .filter((row) => {
-          if (!normalizedMajor) return true;
-          if (!row.major) return true;
-          return normalizeText(row.major) === normalizedMajor;
+          const majorMatched = !normalizedMajor || !row.major || normalizeText(row.major) === normalizedMajor;
+          const heDaoTaoMatched =
+            !normalizedHeDaoTao ||
+            !row.heDaoTao ||
+            normalizeText(row.heDaoTao) === normalizedHeDaoTao;
+          return majorMatched && heDaoTaoMatched;
         })
         .map((row) => row.field);
 
@@ -152,7 +163,7 @@ export function StudentRegister() {
     });
 
     return () => unsubscribe();
-  }, [currentStudentMajor]);
+  }, [currentStudentHeDaoTao, currentStudentMajor]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'quota'), (snapshot) => {
@@ -166,9 +177,11 @@ export function StudentRegister() {
             .trim()
             .toLowerCase(),
           dot: String(data.dot || data.period || data.dothk || '').trim(),
+          heDaoTao: String(data.heDaoTao || data.hedaotao || '').trim(),
           available: Number.isFinite(availableRaw) ? availableRaw : 0,
           maxSlot: Number.isFinite(maxSlotRaw) ? maxSlotRaw : 0,
-          approved: Boolean(data.approved),
+          approved:
+            data.approved === undefined || data.approved === null ? true : Boolean(data.approved),
           hoTen: String(data.hoTen || data.name || '').trim(),
           hasExplicitAvailable: Number.isFinite(availableRaw),
         };
@@ -190,24 +203,46 @@ export function StudentRegister() {
     setField('');
     setAdvisorId('');
 
-    if (type === 'KLTN' && bcttRegistration?.advisorId) {
-      setAdvisorId(bcttRegistration.advisorId);
+    if (type === 'KLTN') {
+      if (bcttRegistration?.field) {
+        setField(bcttRegistration.field);
+      }
+      if (bcttRegistration?.advisorId) {
+        setAdvisorId(bcttRegistration.advisorId);
+      }
     }
-  }, [type, bcttRegistration?.advisorId]);
+  }, [type, bcttRegistration?.advisorId, bcttRegistration?.field]);
 
   useEffect(() => {
-    setAdvisorId('');
+    if (type === 'BCTT') {
+      setAdvisorId('');
+    }
   }, [field]);
+
+  useEffect(() => {
+    if (location.state?.defaultType === 'KLTN') {
+      setType('KLTN');
+    }
+  }, [location.state?.defaultType]);
 
   const availableAdvisors = useMemo(() => {
     if (!field) return [];
 
     const normalizedField = normalizeText(field);
+    const normalizedMajor = normalizeText(currentStudentMajor);
+    const normalizedHeDaoTao = normalizeText(currentStudentHeDaoTao);
+    const matchesMajor = (value: string) =>
+      !normalizedMajor || !value || normalizeText(value) === normalizedMajor;
+    const matchesHeDaoTao = (value: string) =>
+      !normalizedHeDaoTao || !value || normalizeText(value) === normalizedHeDaoTao;
+
     const emails = Array.from(
       new Set(
         fieldMappings
           .filter((row) => row.email)
           .filter((row) => normalizeText(row.field) === normalizedField)
+          .filter((row) => matchesMajor(row.major))
+          .filter((row) => matchesHeDaoTao(row.heDaoTao))
           .map((row) => row.email),
       ),
     );
@@ -218,10 +253,13 @@ export function StudentRegister() {
           (u) => u.role === 'GV' && normalizeText(u.email) === normalizeText(email),
         );
 
+        const quotaRowsForAdvisor = quotaMappings.filter(
+          (q) => q.emailGV === email && matchesHeDaoTao(q.heDaoTao),
+        );
         const quotaForPeriod =
-          quotaMappings.find((q) => q.emailGV === email && q.dot && q.dot === period) ||
-          quotaMappings.find((q) => q.emailGV === email && !q.dot) ||
-          quotaMappings.find((q) => q.emailGV === email);
+          quotaRowsForAdvisor.find((q) => q.dot && q.dot === period) ||
+          quotaRowsForAdvisor.find((q) => !q.dot) ||
+          quotaRowsForAdvisor[0];
 
         if (!quotaForPeriod || !quotaForPeriod.approved) {
           return null;
@@ -232,16 +270,12 @@ export function StudentRegister() {
         const registeredCount = thesisRegistrations.filter((r) => {
           if (r.status === 'advisor_rejected') return false;
           const sameAdvisor = r.advisorId === advisorIdentity || normalizeText(r.advisorId) === normalizeText(email);
-          const samePeriod = !period || r.period === period;
-          return sameAdvisor && samePeriod;
+          return sameAdvisor;
         }).length;
 
         const maxSlot = quotaForPeriod.maxSlot;
-        const available = quotaForPeriod.hasExplicitAvailable
-          ? Math.max(0, quotaForPeriod.available)
-          : Math.max(0, maxSlot - registeredCount);
-
-        const registered = Math.max(0, maxSlot - available);
+        const registered = Math.max(0, registeredCount);
+        const available = Math.max(0, maxSlot - registered);
 
         return {
           id: advisorIdentity,
@@ -257,8 +291,63 @@ export function StudentRegister() {
         return a.displayName.localeCompare(b.displayName, 'vi');
       });
 
-    return results;
-  }, [field, fieldMappings, period, quotaMappings, thesisRegistrations, users]);
+    if (type !== 'KLTN' || !bcttRegistration?.advisorId) {
+      return results;
+    }
+
+    const bcttTeacher = users.find((u) => u.role === 'GV' && u.id === bcttRegistration.advisorId);
+    const bcttEmail = bcttRegistration.advisorId.includes('@')
+      ? bcttRegistration.advisorId.toLowerCase()
+      : (bcttTeacher?.email || '').toLowerCase();
+    const bcttInList = results.find(
+      (advisor) =>
+        advisor.id === bcttRegistration.advisorId ||
+        (bcttEmail && normalizeText(advisor.email) === normalizeText(bcttEmail)),
+    );
+
+    if (bcttInList) {
+      return [bcttInList, ...results.filter((advisor) => advisor !== bcttInList)];
+    }
+
+    const quotaForBctt =
+      quotaMappings.find((q) => q.emailGV === bcttEmail && matchesHeDaoTao(q.heDaoTao) && q.dot && q.dot === period) ||
+      quotaMappings.find((q) => q.emailGV === bcttEmail && matchesHeDaoTao(q.heDaoTao) && !q.dot) ||
+      quotaMappings.find((q) => q.emailGV === bcttEmail && matchesHeDaoTao(q.heDaoTao));
+
+    const bcttAdvisorIdentity = bcttRegistration.advisorId;
+    const registeredCountForBctt = thesisRegistrations.filter((r) => {
+      if (r.status === 'advisor_rejected') return false;
+      const sameAdvisor =
+        r.advisorId === bcttAdvisorIdentity ||
+        (bcttEmail && normalizeText(r.advisorId) === normalizeText(bcttEmail));
+      return sameAdvisor;
+    }).length;
+
+    const maxSlot = Number(quotaForBctt?.maxSlot ?? 0);
+    const registered = Math.max(0, registeredCountForBctt);
+    const available = Math.max(0, maxSlot - registered);
+
+    const fallbackAdvisor = {
+      id: bcttRegistration.advisorId,
+      email: bcttEmail,
+      displayName: bcttTeacher?.fullName || quotaForBctt?.hoTen || bcttRegistration.advisorId,
+      available,
+      registered,
+    };
+
+    return [fallbackAdvisor, ...results];
+  }, [
+    bcttRegistration?.advisorId,
+    currentStudentHeDaoTao,
+    currentStudentMajor,
+    field,
+    fieldMappings,
+    period,
+    quotaMappings,
+    thesisRegistrations,
+    type,
+    users,
+  ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -266,27 +355,27 @@ export function StudentRegister() {
     setSuccess(false);
 
     if (!user?.id) {
-      setError('Không tìm thấy thông tin sinh viên.');
+      setError('\u004b\u0068\u00f4\u006e\u0067 \u0074\u00ec\u006d \u0074\u0068\u1ea5\u0079 \u0074\u0068\u00f4\u006e\u0067 \u0074\u0069\u006e \u0073\u0069\u006e\u0068 \u0076\u0069\u00ea\u006e\u002e');
       return;
     }
 
     if (type === 'KLTN' && !hasBCTT) {
-      setError('Bạn cần hoàn thành BCTT trước khi đăng ký KLTN.');
+      setError('\u0042\u1ea1\u006e \u0063\u1ea7\u006e \u0068\u006f\u00e0\u006e \u0074\u0068\u00e0\u006e\u0068 \u0042\u0043\u0054\u0054 \u0074\u0072\u01b0\u1edb\u0063 \u006b\u0068\u0069 \u0111\u0103\u006e\u0067 \u006b\u00fd \u004b\u004c\u0054\u004e\u002e');
       return;
     }
 
     if (type === 'BCTT' && myRegistrations.some((r) => r.type === 'BCTT')) {
-      setError('Bạn đã đăng ký BCTT rồi.');
+      setError('\u0042\u1ea1\u006e \u0111\u00e3 \u0111\u0103\u006e\u0067 \u006b\u00fd \u0042\u0043\u0054\u0054 \u0072\u1ed3\u0069\u002e');
       return;
     }
 
     if (type === 'KLTN' && hasKLTN) {
-      setError('Bạn đã đăng ký KLTN rồi.');
+      setError('\u0042\u1ea1\u006e \u0111\u00e3 \u0111\u0103\u006e\u0067 \u006b\u00fd \u004b\u004c\u0054\u004e \u0072\u1ed3\u0069\u002e');
       return;
     }
 
     if (availablePeriods.length === 0 || !period) {
-      setError('Hiện chưa có đợt mở đăng ký.');
+      setError('\u0048\u0069\u1ec7\u006e \u0063\u0068\u01b0\u0061 \u0063\u00f3 \u0111\u1ee3\u0074 \u006d\u1edf \u0111\u0103\u006e\u0067 \u006b\u00fd\u002e');
       return;
     }
 
@@ -295,7 +384,7 @@ export function StudentRegister() {
       studentId: user.id,
       type,
       title,
-      companyName,
+      ...(type === 'BCTT' ? { companyName } : {}),
       registeredAt: new Date().toISOString().split('T')[0],
       field,
       advisorId,
@@ -339,7 +428,7 @@ export function StudentRegister() {
               type === 'BCTT' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
             }`}
           >
-            {'Báo cáo thực tập (BCTT)'}
+            {'\u0042\u00e1\u006f \u0063\u00e1\u006f \u0074\u0068\u1ef1\u0063 \u0074\u1ead\u0070 \u0028\u0042\u0043\u0054\u0054\u0029'}
             {hasBCTT ? (
               <CheckCircle className="h-4 w-4 text-green-500" />
             ) : (
@@ -354,7 +443,7 @@ export function StudentRegister() {
               type === 'KLTN' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
             } ${!hasBCTT ? 'cursor-not-allowed opacity-50' : ''}`}
           >
-            {'Khóa luận tốt nghiệp (KLTN)'}
+            {'\u004b\u0068\u00f3\u0061 \u006c\u0075\u1ead\u006e \u0074\u1ed1\u0074 \u006e\u0067\u0068\u0069\u1ec7\u0070 \u0028\u004b\u004c\u0054\u004e\u0029'}
             {hasKLTN ? (
               <CheckCircle className="h-4 w-4 text-green-500" />
             ) : (
@@ -368,35 +457,37 @@ export function StudentRegister() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              Tên đề tài <span className="text-red-500">*</span>
+              {'\u0054\u00ea\u006e \u0111\u1ec1 \u0074\u00e0\u0069'} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              placeholder="Nhập tên đề tài..."
+              placeholder={'\u004e\u0068\u1ead\u0070 \u0074\u00ea\u006e \u0111\u1ec1 \u0074\u00e0\u0069\u002e\u002e\u002e'}
               required
             />
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Tên công ty <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              placeholder="Nhập tên công ty..."
-              required
-            />
-          </div>
+          {type === 'BCTT' && (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Tên công ty <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                placeholder="Nhập tên công ty..."
+                required
+              />
+            </div>
+          )}
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              Lĩnh vực <span className="text-red-500">*</span>
+              {'\u004c\u0129\u006e\u0068 \u0076\u1ef1\u0063'} <span className="text-red-500">*</span>
             </label>
             <select
               value={field}
@@ -407,8 +498,8 @@ export function StudentRegister() {
             >
               <option value="">
                 {availableFields.length === 0
-                  ? 'Chưa có lĩnh vực phù hợp ngành của bạn'
-                  : 'Chọn lĩnh vực'}
+                  ? '\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u006c\u0129\u006e\u0068 \u0076\u1ef1\u0063 \u0070\u0068\u00f9 \u0068\u1ee3\u0070 \u006e\u0067\u00e0\u006e\u0068 \u0063\u1ee7\u0061 \u0062\u1ea1\u006e'
+                  : '\u0043\u0068\u1ecd\u006e \u006c\u0129\u006e\u0068 \u0076\u1ef1\u0063'}
               </option>
               {availableFields.map((f) => (
                 <option key={f} value={f}>
@@ -420,7 +511,7 @@ export function StudentRegister() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              Giảng viên hướng dẫn <span className="text-red-500">*</span>
+              {'\u0047\u0069\u1ea3\u006e\u0067 \u0076\u0069\u00ea\u006e \u0068\u01b0\u1edb\u006e\u0067 \u0064\u1eab\u006e'} <span className="text-red-500">*</span>
             </label>
             <select
               value={advisorId}
@@ -430,15 +521,21 @@ export function StudentRegister() {
               required
             >
               <option value="">
-                {!field
-                  ? 'Chọn lĩnh vực trước'
+                {type === 'KLTN'
+                  ? availableAdvisors.length === 0
+                    ? '\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0047\u0056\u0048\u0044 \u0074\u1eeb \u0111\u0103\u006e\u0067 \u006b\u00fd \u0042\u0043\u0054\u0054'
+                    : '\u0043\u0068\u1ecd\u006e \u0067\u0069\u1ea3\u006e\u0067 \u0076\u0069\u00ea\u006e'
+                  : !field
+                  ? '\u0043\u0068\u1ecd\u006e \u006c\u0129\u006e\u0068 \u0076\u1ef1\u0063 \u0074\u0072\u01b0\u1edb\u0063'
                   : availableAdvisors.length === 0
-                    ? 'Không có giảng viên mở slot cho lĩnh vực đã chọn'
-                    : 'Chọn giảng viên'}
+                    ? '\u004b\u0068\u00f4\u006e\u0067 \u0063\u00f3 \u0067\u0069\u1ea3\u006e\u0067 \u0076\u0069\u00ea\u006e \u006d\u1edf \u0073\u006c\u006f\u0074 \u0063\u0068\u006f \u006c\u0129\u006e\u0068 \u0076\u1ef1\u0063 \u0111\u00e3 \u0063\u0068\u1ecd\u006e'
+                    : '\u0043\u0068\u1ecd\u006e \u0067\u0069\u1ea3\u006e\u0067 \u0076\u0069\u00ea\u006e'}
               </option>
               {availableAdvisors.map((advisor) => (
                 <option key={advisor.id} value={advisor.id}>
-                  {`${advisor.displayName} - Còn lại: ${advisor.available} | Đã đăng ký: ${advisor.registered}`}
+                  {type === 'KLTN'
+                    ? `${advisor.displayName} - \u0043\u00f2\u006e \u006c\u1ea1\u0069\u003a ${advisor.available} | \u0110\u00e3 \u0111\u0103\u006e\u0067 \u006b\u00fd\u003a ${advisor.registered}`
+                    : `${advisor.displayName} - \u0043\u00f2\u006e \u006c\u1ea1\u0069\u003a ${advisor.available} | \u0110\u00e3 \u0111\u0103\u006e\u0067 \u006b\u00fd\u003a ${advisor.registered}`}
                 </option>
               ))}
             </select>
@@ -446,7 +543,7 @@ export function StudentRegister() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              Đợt đăng ký <span className="text-red-500">*</span>
+              {'\u0110\u1ee3\u0074 \u0111\u0103\u006e\u0067 \u006b\u00fd'} <span className="text-red-500">*</span>
             </label>
             <select
               value={period}
@@ -454,7 +551,7 @@ export function StudentRegister() {
               className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               required
             >
-              {availablePeriods.length === 0 && <option value="">Chưa có đợt mở đăng ký</option>}
+              {availablePeriods.length === 0 && <option value="">{'\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0111\u1ee3\u0074 \u006d\u1edf \u0111\u0103\u006e\u0067 \u006b\u00fd'}</option>}
               {availablePeriods.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -474,10 +571,14 @@ export function StudentRegister() {
             type="submit"
             className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl"
           >
-            Đăng ký đề tài
+            {'\u0110\u0103\u006e\u0067 \u006b\u00fd \u0111\u1ec1 \u0074\u00e0\u0069'}
           </button>
         </form>
       </div>
     </div>
   );
 }
+
+
+
+
