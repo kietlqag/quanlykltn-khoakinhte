@@ -32,6 +32,10 @@ export function TbmAssignCouncil() {
 
   const teachers = users.filter((u) => u.role === 'GV');
   const students = users.filter((u) => u.role === 'SV');
+  const activeCouncils = councils.filter((c) => !c.isFinished);
+  const assignedTeacherIdsInActiveCouncils = new Set(
+    activeCouncils.flatMap((c) => [c.chairmanId, c.secretaryId, ...(c.members || [])].filter(Boolean)),
+  );
 
   const gradedRegistrations = thesisRegistrations.filter((r) => r.type === 'KLTN' && Number(r.advisorScore || 0) >= 5 && Number(r.reviewerScore || 0) >= 5);
 
@@ -45,7 +49,11 @@ export function TbmAssignCouncil() {
   };
 
   const availableTeachersFor = (blockedIds: string[], currentId: string) =>
-    teachers.filter((t) => t.id === currentId || !blockedIds.includes(t.id));
+    teachers.filter(
+      (t) =>
+        (t.id === currentId || !blockedIds.includes(t.id)) &&
+        (t.id === currentId || !assignedTeacherIdsInActiveCouncils.has(t.id)),
+    );
 
   const resetNewCouncil = () =>
     setNewCouncil({
@@ -67,6 +75,17 @@ export function TbmAssignCouncil() {
     }
 
     const selectedCouncil = councils.find((c) => c.id === councilId);
+    if (!selectedCouncil || selectedCouncil.isFinished) {
+      alert('Hội đồng này đã hoàn thành hoặc không tồn tại. Vui lòng chọn hội đồng khác.');
+      return;
+    }
+    const reg = thesisRegistrations.find((r) => r.id === regId);
+    if (!reg) return;
+    const memberIds = [selectedCouncil.chairmanId, selectedCouncil.secretaryId, ...(selectedCouncil.members || [])];
+    if (memberIds.includes(reg.advisorId) || (reg.reviewerId && memberIds.includes(reg.reviewerId))) {
+      alert('Không thể phân công: hội đồng này chứa GVHD hoặc GVPB của đề tài.');
+      return;
+    }
 
     updateThesisRegistration(regId, {
       councilId,
@@ -75,7 +94,6 @@ export function TbmAssignCouncil() {
       defenseLocation: selectedCouncil?.location || 'Phòng A101',
     });
 
-    const reg = thesisRegistrations.find((r) => r.id === regId);
     const student = students.find((s) => s.id === reg?.studentId);
     if (reg && student?.email) {
       const statusQuery = query(
@@ -121,6 +139,11 @@ export function TbmAssignCouncil() {
       alert('Không được chọn trùng giảng viên trong cùng hội đồng.');
       return;
     }
+    const selectedAlreadyAssigned = selected.find((id) => assignedTeacherIdsInActiveCouncils.has(id));
+    if (selectedAlreadyAssigned) {
+      alert('Không thể tạo hội đồng: có giảng viên đã ở hội đồng khác chưa hoàn thành.');
+      return;
+    }
 
     const councilNameInput = newCouncil.number.trim();
     const councilName = /^hội đồng\b/i.test(councilNameInput)
@@ -163,7 +186,7 @@ export function TbmAssignCouncil() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex items-center rounded-full bg-gray-200 p-1">
           <button type="button" className={tabButtonClass('create')} onClick={() => setActiveTab('create')}>
-            Tạo hội đồng ({councils.length})
+            Tạo hội đồng ({activeCouncils.length})
           </button>
           <button type="button" className={tabButtonClass('assign')} onClick={() => setActiveTab('assign')}>
             Phân công hội đồng ({gradedRegistrations.length})
@@ -231,7 +254,7 @@ export function TbmAssignCouncil() {
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
                   >
                     <option value="">Chọn chủ tịch</option>
-                    {teachers.map((t) => (
+                    {availableTeachersFor([], newCouncil.chairmanId).map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.fullName}
                       </option>
@@ -321,12 +344,12 @@ export function TbmAssignCouncil() {
           )}
 
           <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-            {councils.length === 0 && (
+            {activeCouncils.length === 0 && (
               <div className="rounded-2xl border border-gray-200 bg-white px-4 py-6 text-center text-gray-500 lg:col-span-2">
                 Chưa có hội đồng nào
               </div>
             )}
-            {councils.map((council, index) => (
+            {activeCouncils.map((council, index) => (
               <div
                 key={council.id}
                 className="rounded-xl border border-blue-100 bg-gradient-to-r from-white to-blue-50/60 p-3 shadow-sm"
@@ -409,7 +432,7 @@ export function TbmAssignCouncil() {
                             className="min-w-[140px] flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 disabled:bg-gray-100 disabled:text-gray-500"
                           >
                             <option value="">Chọn hội đồng</option>
-                            {councils.map((council) => (
+                            {activeCouncils.map((council) => (
                               <option key={council.id} value={council.id}>
                                 {council.name}
                               </option>

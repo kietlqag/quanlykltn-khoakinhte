@@ -50,6 +50,7 @@ export interface ThesisRegistration {
   reviewerComments?: string;
   councilComments?: string;
   chairmanComments?: string;
+  chairmanPostRevisionComment?: string;
   councilMemberComments?: Record<string, string>;
   submissionDeadline?: string;
   advisorCriteriaScores?: Record<string, number>;

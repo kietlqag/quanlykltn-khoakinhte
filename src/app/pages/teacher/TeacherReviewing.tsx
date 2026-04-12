@@ -229,23 +229,13 @@ export function TeacherReviewing() {
 
                 <div className="md:col-span-2 md:text-center">
                   {reg.pdfUrl ? (
-                    <div className="inline-flex items-center gap-2">
-                      <button
-                        onClick={() => setViewingSubmissionRegId(reg.id)}
-                        className="inline-flex items-center gap-1.5 border-0 bg-transparent p-0 text-[13px] font-semibold leading-5 text-blue-700 hover:underline"
-                      >
-                        <Eye className="h-4 w-4 text-blue-600" />
-                        Xem bài
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => triggerDownload(reg.pdfUrl, `${reg.studentId}-bao-cao-kltn.pdf`)}
-                        className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
-                        title="Tải xuống"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setViewingSubmissionRegId(reg.id)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:opacity-90"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Xem bài
+                    </button>
                   ) : (
                     <span className="text-sm text-gray-400">-</span>
                   )}

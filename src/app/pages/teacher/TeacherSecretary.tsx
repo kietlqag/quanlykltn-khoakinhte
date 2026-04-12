@@ -257,6 +257,7 @@ export function TeacherSecretary() {
   const { thesisRegistrations, councils, users, updateThesisRegistration } = useData();
   const [editingMinutes, setEditingMinutes] = useState<string | null>(null);
   const [councilComments, setCouncilComments] = useState<string>('');
+  const [chairmanPostRevisionComment, setChairmanPostRevisionComment] = useState<string>('');
 
   const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -322,7 +323,7 @@ export function TeacherSecretary() {
       ...wrapText(`${tv2Name}: ${tv2Comment}`, 95),
     ].slice(0, 15);
     const section3Lines = (councilComments.trim() ? wrapText(councilComments, 95) : ['\u004b\u0068\u00f4ng c\u00f3']).slice(0, 6);
-    const section4Lines: string[] = [];
+    const section4Lines = (chairmanPostRevisionComment.trim() ? wrapText(chairmanPostRevisionComment, 95) : ['\u004b\u0068\u00f4ng c\u00f3']).slice(0, 3);
 
     try {
       if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
@@ -367,6 +368,7 @@ export function TeacherSecretary() {
           title: reg.title,
           councilComments,
           chairmanComments: reg.chairmanComments || '',
+          chairmanPostRevisionComment,
           councilMemberComments: reg.councilMemberComments || {},
           advisorScore: reg.advisorScore ?? null,
           reviewerScore: reg.reviewerScore ?? null,
@@ -381,12 +383,14 @@ export function TeacherSecretary() {
       updateThesisRegistration(regId, {
         councilMinutesUrl: pdfUrl,
         councilComments,
+        chairmanPostRevisionComment,
         finalScore: finalScoreNumber ?? undefined,
         status: finalScoreNumber !== null ? 'defended' : reg.status,
       });
 
       setEditingMinutes(null);
       setCouncilComments('');
+      setChairmanPostRevisionComment('');
       alert('\u0110\u00e3 l\u01b0u bi\u00ean b\u1ea3n PDF th\u00e0nh c\u00f4ng');
     } catch (error) {
       console.error(error);
@@ -502,6 +506,7 @@ export function TeacherSecretary() {
                             if (councilFinished) return;
                             setEditingMinutes(reg.id);
                             setCouncilComments(reg.councilComments || '');
+                            setChairmanPostRevisionComment(reg.chairmanPostRevisionComment || '');
                           }}
                           disabled={councilFinished}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 rounded-full text-xs font-semibold text-red-700 hover:bg-red-200 ${
@@ -627,6 +632,18 @@ export function TeacherSecretary() {
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Ý kiến của Chủ tịch sau khi chỉnh sửa</label>
+                      <textarea
+                        value={chairmanPostRevisionComment}
+                        onChange={(e) => setChairmanPostRevisionComment(e.target.value)}
+                        disabled={councilFinished}
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100"
+                        placeholder="Nhập ý kiến sau khi sinh viên chỉnh sửa..."
+                      />
+                    </div>
+
 
                     <div className="flex gap-2 pt-4">
                       <button
@@ -640,6 +657,7 @@ export function TeacherSecretary() {
                         onClick={() => {
                           setEditingMinutes(null);
                           setCouncilComments('');
+                          setChairmanPostRevisionComment('');
                         }}
                         className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
                       >

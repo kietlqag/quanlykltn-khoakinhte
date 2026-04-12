@@ -313,6 +313,9 @@ export function StudentRegister() {
       quotaMappings.find((q) => q.emailGV === bcttEmail && matchesHeDaoTao(q.heDaoTao) && q.dot && q.dot === period) ||
       quotaMappings.find((q) => q.emailGV === bcttEmail && matchesHeDaoTao(q.heDaoTao) && !q.dot) ||
       quotaMappings.find((q) => q.emailGV === bcttEmail && matchesHeDaoTao(q.heDaoTao));
+    if (quotaForBctt && !quotaForBctt.approved) {
+      return results;
+    }
 
     const bcttAdvisorIdentity = bcttRegistration.advisorId;
     const registeredCountForBctt = thesisRegistrations.filter((r) => {
@@ -523,7 +526,7 @@ export function StudentRegister() {
               <option value="">
                 {type === 'KLTN'
                   ? availableAdvisors.length === 0
-                    ? '\u0043\u0068\u01b0\u0061 \u0063\u00f3 \u0047\u0056\u0048\u0044 \u0074\u1eeb \u0111\u0103\u006e\u0067 \u006b\u00fd \u0042\u0043\u0054\u0054'
+                    ? '\u004b\u0068\u00f4\u006e\u0067 \u0063\u00f3 \u0047\u0056 \u0070\u0068\u00f9 \u0068\u1ee3\u0070'
                     : '\u0043\u0068\u1ecd\u006e \u0067\u0069\u1ea3\u006e\u0067 \u0076\u0069\u00ea\u006e'
                   : !field
                   ? '\u0043\u0068\u1ecd\u006e \u006c\u0129\u006e\u0068 \u0076\u1ef1\u0063 \u0074\u0072\u01b0\u1edb\u0063'

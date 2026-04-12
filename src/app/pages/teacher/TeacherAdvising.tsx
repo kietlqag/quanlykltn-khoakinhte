@@ -344,6 +344,12 @@ export function TeacherAdvising() {
       advisorApprovalRevision: approve,
       chairmanApprovalRevision: false,
       status: 'revision_pending',
+      ...(approve
+        ? {}
+        : {
+            revisedPdfUrl: '',
+            revisionExplanationUrl: '',
+          }),
     });
     setRevisionReviewFor(null);
     alert(approve ? 'Đã duyệt chỉnh sửa' : 'Đã từ chối chỉnh sửa');

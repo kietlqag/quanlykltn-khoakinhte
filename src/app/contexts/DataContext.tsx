@@ -189,6 +189,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             reviewerComments: String(data.reviewerComments || '') || undefined,
             councilComments: String(data.councilComments || '') || undefined,
             chairmanComments: String(data.chairmanComments || '') || undefined,
+            chairmanPostRevisionComment: String(data.chairmanPostRevisionComment || '') || undefined,
             councilMemberComments:
               data.councilMemberComments && typeof data.councilMemberComments === 'object'
                 ? Object.fromEntries(
