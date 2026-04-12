@@ -77,6 +77,10 @@ const I18N = {
   kltnUploadingDraft: '\u0110ang t\u1ea3i file KLTN...',
   kltnStatusGrading: 'TR\u1ea0NG TH\u00c1I: \u0110ANG CH\u1ea4M \u0110I\u1ec2M',
   kltnGradingDesc: 'GVHD & GVPB \u0111ang xem x\u00e9t b\u00e0i l\u00e0m c\u1ee7a b\u1ea1n.',
+  kltnEligibleCouncilStatus: 'TR\u1ea0NG TH\u00c1I: \u0110\u1ee6 \u0110I\u1ec0U KI\u1ec6N RA H\u1ed8I \u0110\u1ed2NG B\u1ea2O V\u1ec6 KLTN',
+  kltnEligibleCouncilDesc: 'B\u1ea1n \u0111\u1ee7 \u0111i\u1ec1u ki\u1ec7n ra h\u1ed9i \u0111\u1ed3ng b\u1ea3o v\u1ec7 KLTN.',
+  kltnIneligibleCouncilStatus: 'TR\u1ea0NG TH\u00c1I: KH\u00d4NG \u0110\u1ee6 \u0110I\u1ec0U KI\u1ec6N RA H\u1ed8I \u0110\u1ed2NG B\u1ea2O V\u1ec6 KLTN',
+  kltnIneligibleCouncilDesc: 'B\u1ea1n ch\u01b0a \u0111\u1ee7 \u0111i\u1ec1u ki\u1ec7n ra h\u1ed9i \u0111\u1ed3ng b\u1ea3o v\u1ec7 KLTN.',
   advisorGraded: '\u0110\u00e3 ch\u1ea5m',
   advisorGrading: '\u0110ang ch\u1ea5m',
   reviewerGraded: '\u0110\u00e3 ch\u1ea5m',
@@ -504,6 +508,13 @@ export function StudentStatus() {
   const kltnIsCouncil = kltnStatus === 'defended';
   const kltnIsRevision = kltnStatus === 'revision_pending';
   const kltnIsCompleted = kltnStatus === 'completed';
+  const kltnHasBothScores =
+    typeof kltn?.advisorScore === 'number' &&
+    typeof kltn?.reviewerScore === 'number';
+  const kltnEligibleForCouncil =
+    kltnHasBothScores &&
+    kltn.advisorScore >= 5 &&
+    kltn.reviewerScore >= 5;
   const kltnScore =
     typeof kltn?.finalScore === 'number'
       ? kltn.finalScore
@@ -761,9 +772,39 @@ export function StudentStatus() {
 
       {statusTab === 'KLTN' && latestKltn && kltnIsGrading && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-900">{I18N.kltnStatusGrading}</p>
-            <p className="text-sm text-amber-800 mt-1">{I18N.kltnGradingDesc}</p>
+          <div className={`rounded-lg border px-4 py-3 ${
+            kltnHasBothScores
+              ? kltnEligibleForCouncil
+                ? 'border-green-200 bg-green-50'
+                : 'border-rose-200 bg-rose-50'
+              : 'border-amber-200 bg-amber-50'
+          }`}>
+            <p className={`text-sm font-semibold ${
+              kltnHasBothScores
+                ? kltnEligibleForCouncil
+                  ? 'text-green-900'
+                  : 'text-rose-900'
+                : 'text-amber-900'
+            }`}>
+              {kltnHasBothScores
+                ? kltnEligibleForCouncil
+                  ? I18N.kltnEligibleCouncilStatus
+                  : I18N.kltnIneligibleCouncilStatus
+                : I18N.kltnStatusGrading}
+            </p>
+            <p className={`text-sm mt-1 ${
+              kltnHasBothScores
+                ? kltnEligibleForCouncil
+                  ? 'text-green-800'
+                  : 'text-rose-800'
+                : 'text-amber-800'
+            }`}>
+              {kltnHasBothScores
+                ? kltnEligibleForCouncil
+                  ? I18N.kltnEligibleCouncilDesc
+                  : I18N.kltnIneligibleCouncilDesc
+                : I18N.kltnGradingDesc}
+            </p>
           </div>
 
           <div className="rounded-lg border border-gray-200 p-4 text-sm text-gray-700 space-y-3">
@@ -774,7 +815,8 @@ export function StudentStatus() {
               <p className={`${typeof kltn.advisorScore === 'number' ? 'text-green-700' : 'text-amber-700'} font-medium mt-1`}>
                 {typeof kltn.advisorScore === 'number' ? `${I18N.advisorGraded}: ${kltn.advisorScore.toFixed(1)}` : I18N.advisorGrading}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{I18N.waitAdvisorScore}</p>
+              
+              <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Nhận xét:</span> {kltn.advisorComments || 'Chưa có nhận xét'}</p>
             </div>
 
             <div className="border-t border-gray-200 pt-3">
@@ -784,7 +826,8 @@ export function StudentStatus() {
               <p className={`${typeof kltn.reviewerScore === 'number' ? 'text-green-700' : 'text-amber-700'} font-medium mt-1`}>
                 {typeof kltn.reviewerScore === 'number' ? `${I18N.reviewerGraded}: ${kltn.reviewerScore.toFixed(1)}` : I18N.reviewerGrading}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{I18N.waitReviewerScore}</p>
+              
+              <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Nhận xét:</span> {kltn.reviewerComments || 'Chưa có nhận xét'}</p>
             </div>
           </div>
         </div>
@@ -813,6 +856,14 @@ export function StudentStatus() {
                 </div>
               </div>
             </div>
+            {typeof kltn.finalScore === 'number' && (
+              <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                <p className="font-medium text-gray-900">
+                  Kết quả: {kltn.finalScore >= 5 ? 'Hoàn thành' : 'Không đạt'}
+                </p>
+                <p className="text-gray-700">Điểm tổng kết: {kltn.finalScore.toFixed(2)}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1114,3 +1165,6 @@ export function StudentStatus() {
     </div>
   );
 }
+
+
+

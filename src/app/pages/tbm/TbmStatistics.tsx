@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useData } from '../../contexts/DataContext';
 import { CheckCircle, Clock } from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -13,11 +13,14 @@ export function TbmStatistics() {
     ? thesisRegistrations.filter((r) => r.period === currentPeriod)
     : thesisRegistrations;
 
-  const revisionRows = periodRegistrations.filter((r) => r.revisedPdfUrl || r.revisionExplanationUrl);
+  const isKLTN = (value?: string) => String(value || '').toUpperCase().includes('KLTN');
+  const kltnRows = periodRegistrations.filter((r) => isKLTN(r.type));
+  const fallbackKltnRows = thesisRegistrations.filter((r) => isKLTN(r.type));
+  const dataRows = kltnRows.length > 0 ? kltnRows : fallbackKltnRows;
 
   const getStudentName = (studentId: string) => students.find((s) => s.id === studentId)?.fullName || 'N/A';
 
-  const scoreChartData = revisionRows
+  const scoreChartData = dataRows
     .filter((r) => typeof r.finalScore === 'number')
     .map((r) => ({
       name: getStudentName(r.studentId).split(' ').slice(-2).join(' '),
@@ -26,17 +29,17 @@ export function TbmStatistics() {
     .slice(0, 8);
 
   const advisorApproveData = [
-    { name: 'Đã duyệt', value: revisionRows.filter((r) => r.advisorApprovalRevision).length, color: '#22C55E' },
-    { name: 'Chưa duyệt', value: revisionRows.filter((r) => !r.advisorApprovalRevision).length, color: '#F59E0B' },
+    { name: 'Đã duyệt', value: dataRows.filter((r) => r.advisorApprovalRevision).length, color: '#22C55E' },
+    { name: 'Chưa duyệt', value: dataRows.filter((r) => !r.advisorApprovalRevision).length, color: '#F59E0B' },
   ];
 
   const chairmanApproveData = [
-    { name: 'Đã duyệt', value: revisionRows.filter((r) => r.chairmanApprovalRevision).length, color: '#3B82F6' },
-    { name: 'Chưa duyệt', value: revisionRows.filter((r) => !r.chairmanApprovalRevision).length, color: '#EF4444' },
+    { name: 'Đã duyệt', value: dataRows.filter((r) => r.chairmanApprovalRevision).length, color: '#3B82F6' },
+    { name: 'Chưa duyệt', value: dataRows.filter((r) => !r.chairmanApprovalRevision).length, color: '#EF4444' },
   ];
 
   const fieldData = Object.entries(
-    revisionRows.reduce<Record<string, number>>((acc, row) => {
+    dataRows.reduce<Record<string, number>>((acc, row) => {
       const key = row.field || 'Chưa cập nhật';
       acc[key] = (acc[key] || 0) + 1;
       return acc;
@@ -60,7 +63,7 @@ export function TbmStatistics() {
               </tr>
             </thead>
             <tbody>
-              {revisionRows.map((row) => (
+              {dataRows.map((row) => (
                 <tr key={row.id} className="border-b border-gray-100 align-top hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-semibold text-gray-900">{getStudentName(row.studentId)}</div>
@@ -118,7 +121,7 @@ export function TbmStatistics() {
                   </td>
                 </tr>
               ))}
-              {revisionRows.length === 0 && (
+              {dataRows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">
                     Chưa có dữ liệu
@@ -191,3 +194,4 @@ export function TbmStatistics() {
     </div>
   );
 }
+

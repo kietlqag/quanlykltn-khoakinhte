@@ -54,7 +54,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const raw = String(value || '').trim().toLowerCase();
       if (!raw) return 'pending';
       if (
-        raw.includes('khÃ´ng') ||
+        raw.includes('không') ||
         raw.includes('tu choi') ||
         raw.includes('rejected') ||
         raw.includes('reject')
@@ -64,7 +64,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (raw.includes('cho') && raw.includes('duyet')) return 'pending';
       if (
         raw.includes('duyet') ||
-        raw.includes('Ä‘á»“ng Ã½') ||
+        raw.includes('đồng ý') ||
         raw.includes('dong y') ||
         raw.includes('approved') ||
         raw === 'yes'
@@ -156,7 +156,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             advisorScore: typeof data.advisorScore === 'number' ? data.advisorScore : undefined,
             reviewerScore: typeof data.reviewerScore === 'number' ? data.reviewerScore : undefined,
             councilScore: typeof data.councilScore === 'number' ? data.councilScore : undefined,
+            chairmanScore: typeof data.chairmanScore === 'number' ? data.chairmanScore : undefined,
+            chairmanCriteriaScores:
+              data.chairmanCriteriaScores && typeof data.chairmanCriteriaScores === 'object'
+                ? (data.chairmanCriteriaScores as Record<string, number>)
+                : undefined,
+            councilMemberScores:
+              data.councilMemberScores && typeof data.councilMemberScores === 'object'
+                ? (data.councilMemberScores as Record<string, number>)
+                : undefined,
+            councilMemberCriteriaScores:
+              data.councilMemberCriteriaScores && typeof data.councilMemberCriteriaScores === 'object'
+                ? (data.councilMemberCriteriaScores as Record<string, Record<string, number>>)
+                : undefined,
             finalScore: typeof data.finalScore === 'number' ? data.finalScore : undefined,
+            scoreLocked: typeof data.scoreLocked === 'boolean' ? data.scoreLocked : undefined,
             defenseDate: String(data.defenseDate || '') || undefined,
             defenseLocation: String(data.defenseLocation || '') || undefined,
             councilMinutesUrl: String(data.councilMinutesUrl || '') || undefined,
@@ -173,6 +187,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             advisorComments: String(data.advisorComments || '') || undefined,
             reviewerComments: String(data.reviewerComments || '') || undefined,
             councilComments: String(data.councilComments || '') || undefined,
+            chairmanComments: String(data.chairmanComments || '') || undefined,
+            councilMemberComments:
+              data.councilMemberComments && typeof data.councilMemberComments === 'object'
+                ? Object.fromEntries(
+                    Object.entries(data.councilMemberComments as Record<string, unknown>).map(([k, v]) => [k, String(v || '')]),
+                  )
+                : undefined,
             submissionDeadline: String(data.submissionDeadline || '') || undefined,
             advisorCriteriaScores:
               data.advisorCriteriaScores && typeof data.advisorCriteriaScores === 'object'
@@ -314,7 +335,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           );
           const existedReg = await getDocs(existedRegQuery);
           if (!existedReg.empty) {
-            throw new Error(`Báº¡n Ä‘Ã£ Ä‘Äƒng kÃ½ ${registration.type} rá»“i.`);
+            throw new Error(`Bạn đã đăng ký ${registration.type} rồi.`);
           }
 
           if (registration.type === 'KLTN') {
@@ -327,7 +348,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             );
             const bcttDone = await getDocs(bcttQuery);
             if (bcttDone.empty) {
-              throw new Error('Báº¡n cáº§n hoÃ n thÃ nh BCTT trÆ°á»›c khi Ä‘Äƒng kÃ½ KLTN.');
+              throw new Error('Bạn cần hoàn thành BCTT trước khi đăng ký KLTN.');
             }
           }
           const quotaSnap = await getDocs(collection(db, 'quota'));
@@ -429,7 +450,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           const ref = doc(db, 'thesis_registrations', id);
           const snap = await tx.get(ref);
           if (!snap.exists()) {
-            throw new Error('KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ Ä‘Äƒng kÃ½.');
+            throw new Error('Không tìm thấy hồ sơ đăng ký.');
           }
           const current = snap.data() as ThesisRegistration;
           if (
@@ -437,7 +458,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             updates.advisorApprovalRevision !== true &&
             current.advisorApprovalRevision !== true
           ) {
-            throw new Error('Chá»§ tá»‹ch chá»‰ Ä‘Æ°á»£c duyá»‡t sau khi GVHD Ä‘Ã£ duyá»‡t.');
+            throw new Error('Chủ tịch chỉ được duyệt sau khi GVHD đã duyệt.');
           }
 
           tx.update(ref, {

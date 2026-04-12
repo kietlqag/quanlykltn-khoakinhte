@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { BookOpen, CheckCircle, X, Upload, UploadCloud, Eye, Save, Users, Search, Download, Pencil, Settings } from 'lucide-react';
@@ -39,6 +39,7 @@ export function TeacherAdvising() {
   const [advisorAppScores, setAdvisorAppScores] = useState<Record<string, number>>({});
   const [advisorAppComments, setAdvisorAppComments] = useState('');
   const [scoreDraft, setScoreDraft] = useState('');
+  const [revisionReviewFor, setRevisionReviewFor] = useState<string | null>(null);
   const [viewingSubmissionRegId, setViewingSubmissionRegId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -70,6 +71,13 @@ export function TeacherAdvising() {
       .join(' ')
       .toLowerCase();
     return haystack.includes(q);
+  };
+
+  const detectRubricType = (scores?: Record<string, number>) => {
+    const keys = Object.keys(scores || {});
+    if (keys.some((k) => k.startsWith('r'))) return 'nghien_cuu';
+    if (keys.some((k) => k.startsWith('c'))) return 'ung_dung';
+    return null;
   };
 
   const handleBulkApprove = (approve: boolean) => {
@@ -217,7 +225,7 @@ export function TeacherAdvising() {
       alert('Upload Turnitin thành công');
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : 'Upload Turnitin thất bại';
+      const message = error instanceof Error ? error.message : 'Upload Turnitin tháº¥t báº¡i';
       alert(message);
     } finally {
       setIsUploading(false);
@@ -245,6 +253,10 @@ export function TeacherAdvising() {
   const handleSaveScore = (regId: string, rawScore: string) => {
     const reg = myStudents.find((r) => r.id === regId);
     if (!reg) return;
+    if (reg.scoreLocked) {
+      alert('Điểm đã bị khóa, không thể chỉnh sửa.');
+      return;
+    }
 
     const parsed = Number(rawScore);
     if (!Number.isFinite(parsed)) {
@@ -271,6 +283,20 @@ export function TeacherAdvising() {
   };
 
   const handleOpenScoreTypePicker = (regId: string) => {
+    const reg = myStudents.find((r) => r.id === regId);
+    if (!reg) return;
+    if (reg.scoreLocked) {
+      alert('Điểm đã bị khóa, không thể chỉnh sửa.');
+      return;
+    }
+    const detected = detectRubricType(reg.advisorCriteriaScores as Record<string, number> | undefined);
+    if (detected) {
+      setAdvisorRubricType(detected);
+      setAdvisorAppScores((reg.advisorCriteriaScores as Record<string, number>) || {});
+      setAdvisorAppComments(reg.advisorComments || '');
+      setAdvisorAppScoreFor(regId);
+      return;
+    }
     setScoreTypePickerFor(regId);
   };
 
@@ -285,13 +311,19 @@ export function TeacherAdvising() {
   };
 
   const handleSaveAdvisorAppScore = (regId: string) => {
+    const reg = myStudents.find((r) => r.id === regId);
+    if (reg?.scoreLocked) {
+      alert('Điểm đã bị khóa, không thể chỉnh sửa.');
+      return;
+    }
     const criteria =
       advisorRubricType === 'nghien_cuu' ? ADVISOR_RESEARCH_CRITERIA : ADVISOR_APP_CRITERIA;
     const total = Number(
       criteria.reduce((sum, c) => sum + (advisorAppScores[c.id] || 0), 0).toFixed(2),
     );
+    const finalScore = Math.min(total, 10);
     updateThesisRegistration(regId, {
-      advisorScore: total,
+      advisorScore: finalScore,
       advisorCriteriaScores: advisorAppScores,
       advisorComments: advisorAppComments.trim() || undefined,
     });
@@ -299,6 +331,16 @@ export function TeacherAdvising() {
     setAdvisorAppScores({});
     setAdvisorAppComments('');
     alert('Đã lưu điểm');
+  };
+
+  const handleAdvisorRevisionDecision = (regId: string, approve: boolean) => {
+    updateThesisRegistration(regId, {
+      advisorApprovalRevision: approve,
+      chairmanApprovalRevision: false,
+      status: 'revision_pending',
+    });
+    setRevisionReviewFor(null);
+    alert(approve ? 'Đã duyệt chỉnh sửa' : 'Đã từ chối chỉnh sửa');
   };
 
   const handleMarkBcttPassed = (regId: string) => {
@@ -454,7 +496,7 @@ export function TeacherAdvising() {
                       </div>
                       <div className="mt-1 flex items-center gap-2 flex-wrap text-xs text-gray-500">
                         <span className="truncate">{reg.studentId}</span>
-                        <span>â€¢</span>
+                        <span>•</span>
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-700 font-medium rounded">{reg.type}</span>
                         <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-medium rounded">
                           {reg.period}
@@ -601,9 +643,25 @@ export function TeacherAdvising() {
 
                   <div className={activeTab === 'kltn' ? 'md:text-center' : 'md:col-span-1 md:text-center'}>
                     {typeof reg.advisorScore === 'number' ? (
-                      <span className="inline-flex items-center justify-center min-w-8 rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
+                      <button
+                        type="button"
+                        disabled={Boolean(reg.scoreLocked)}
+                        onClick={() => {
+                          if (reg.type === 'KLTN') {
+                            handleOpenScoreTypePicker(reg.id);
+                            return;
+                          }
+                          setScoringFor(reg.id);
+                          setScoreDraft(String(reg.advisorScore ?? ''));
+                        }}
+                        className={`inline-flex items-center justify-center min-w-8 rounded-full px-2 py-1 text-xs font-bold ${
+                          reg.scoreLocked
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                        }`}
+                      >
                         {reg.advisorScore}
-                      </span>
+                      </button>
                     ) : scoringFor === reg.id ? (
                       <div className="inline-flex items-center gap-1">
                         <input
@@ -647,7 +705,12 @@ export function TeacherAdvising() {
                           setScoringFor(reg.id);
                           setScoreDraft('');
                         }}
-                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-200"
+                        disabled={Boolean(reg.scoreLocked)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          reg.scoreLocked
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                        }`}
                       >
                         <Pencil className="h-3.5 w-3.5" />
                         {'\u0043\u0068\u1ea5\u006d \u0111\u0069\u1ec3\u006d'}
@@ -657,17 +720,24 @@ export function TeacherAdvising() {
 
                   {activeTab === 'kltn' && (
                     <div className="md:text-center">
-                      {reg.revisionExplanationUrl ? (
-                        <button
-                          onClick={() =>
-                            reg.revisionExplanationUrl &&
-                            window.open(reg.revisionExplanationUrl, '_blank', 'noopener,noreferrer')
-                          }
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:opacity-90"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Xem
-                        </button>
+                      {reg.revisedPdfUrl ? (
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setRevisionReviewFor(reg.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:opacity-90"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Xem duyệt
+                          </button>
+                          <span
+                            className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              reg.advisorApprovalRevision ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {reg.advisorApprovalRevision ? 'Đã duyệt' : 'Chờ duyệt'}
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-400">-</span>
                       )}
@@ -707,7 +777,7 @@ export function TeacherAdvising() {
 
       {viewingSubmissionRegId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             {(() => {
               const activeReg = myStudents.find((item) => item.id === viewingSubmissionRegId);
               if (!activeReg) return null;
@@ -726,9 +796,9 @@ export function TeacherAdvising() {
                     </button>
                   </div>
 
-                  <div className="grid gap-4 px-6 py-6 md:grid-cols-2">
-                    <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
-                      <p className="text-sm font-semibold text-gray-900">{'\u0042\u00e0\u0069 \u006c\u00e0\u006d \u0042\u0043\u0054\u0054 \u0028\u0050\u0044\u0046\u0029'}</p>
+                  <div className={`grid gap-4 px-6 py-6 ${activeReg.type === 'BCTT' ? 'md:grid-cols-2' : 'md:grid-cols-1 md:justify-items-center'}`}> 
+                    <div className={`rounded-2xl border border-blue-200 bg-blue-50/60 p-4 ${activeReg.type === 'KLTN' ? 'w-full md:max-w-md' : ''}`}> 
+                      <p className="text-sm font-semibold text-gray-900">{activeReg.type === 'KLTN' ? 'Bài làm KLTN (PDF)' : 'Bài làm BCTT (PDF)'}</p>
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         <button
                           onClick={() =>
@@ -744,7 +814,7 @@ export function TeacherAdvising() {
                         {activeReg.pdfUrl ? (
                           <button
                             type="button"
-                            onClick={() => triggerDownload(activeReg.pdfUrl, `${activeReg.studentId}-bao-cao-bctt.pdf`)}
+                            onClick={() => triggerDownload(activeReg.pdfUrl, `${activeReg.studentId}-${activeReg.type === 'KLTN' ? 'bao-cao-kltn' : 'bao-cao-bctt'}.pdf`)}
                             className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
                           >
                             <Download className="h-3.5 w-3.5" />
@@ -799,9 +869,76 @@ export function TeacherAdvising() {
         </div>
       )}
 
-      {uploadingTurnitin && (
+      {revisionReviewFor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {(() => {
+              const reg = myStudents.find((item) => item.id === revisionReviewFor);
+              if (!reg) return null;
+              return (
+                <>
+                  <div className="flex items-start justify-between border-b border-gray-200 px-6 py-5">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Duyệt bài chỉnh sửa</h2>
+                      <p className="mt-1 text-sm text-gray-600">{reg.title}</p>
+                    </div>
+                    <button
+                      onClick={() => setRevisionReviewFor(null)}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="px-6 py-6 space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => reg.revisedPdfUrl && window.open(reg.revisedPdfUrl, '_blank', 'noopener,noreferrer')}
+                        disabled={!reg.revisedPdfUrl}
+                        className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Xem bài sửa
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => reg.revisionExplanationUrl && window.open(reg.revisionExplanationUrl, '_blank', 'noopener,noreferrer')}
+                        disabled={!reg.revisionExplanationUrl}
+                        className="inline-flex items-center gap-1 rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Xem giải trình
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleAdvisorRevisionDecision(reg.id, true)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700"
+                      >
+                        Duyệt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAdvisorRevisionDecision(reg.id, false)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700"
+                      >
+                        Không duyệt
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {uploadingTurnitin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             {(() => {
               const activeReg = myStudents.find((item) => item.id === uploadingTurnitin);
               if (!activeReg) return null;
@@ -1008,8 +1145,8 @@ export function TeacherAdvising() {
                     setAdvisorAppScores({});
                     setAdvisorAppComments('');
                   }}
-                  aria-label="Quay lại"
-                  title="Quay lại"
+                  aria-label="Quay láº¡i"
+                  title="Quay láº¡i"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-gray-300 text-gray-700 hover:bg-gray-400"
                 >
                   <X className="h-5 w-5" />
@@ -1031,3 +1168,7 @@ export function TeacherAdvising() {
     </div>
   );
 }
+
+
+
+

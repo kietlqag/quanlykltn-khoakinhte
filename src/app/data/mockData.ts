@@ -33,7 +33,12 @@ export interface ThesisRegistration {
   advisorScore?: number;
   reviewerScore?: number;
   councilScore?: number;
+  chairmanScore?: number;
+  chairmanCriteriaScores?: Record<string, number>;
+  councilMemberScores?: Record<string, number>;
+  councilMemberCriteriaScores?: Record<string, Record<string, number>>;
   finalScore?: number;
+  scoreLocked?: boolean;
   defenseDate?: string;
   defenseLocation?: string;
   councilMinutesUrl?: string;
@@ -44,6 +49,8 @@ export interface ThesisRegistration {
   advisorComments?: string;
   reviewerComments?: string;
   councilComments?: string;
+  chairmanComments?: string;
+  councilMemberComments?: Record<string, string>;
   submissionDeadline?: string;
   advisorCriteriaScores?: Record<string, number>;
   reviewerCriteriaScores?: Record<string, number>;
@@ -69,7 +76,7 @@ export const mockUsers: User[] = [
     username: '2001212345',
     password: '123456',
     role: 'SV',
-    fullName: 'Nguyễn Văn An',
+    fullName: 'Nguy�n Vn An',
     email: 'an.nguyen@student.hcmute.edu.vn',
   },
   {
@@ -77,7 +84,7 @@ export const mockUsers: User[] = [
     username: '2001212346',
     password: '123456',
     role: 'SV',
-    fullName: 'Trần Thị Bảo',
+    fullName: 'Tr�n Th� B�o',
     email: 'bao.tran@student.hcmute.edu.vn',
   },
   {
@@ -85,7 +92,7 @@ export const mockUsers: User[] = [
     username: '2001212347',
     password: '123456',
     role: 'SV',
-    fullName: 'Lê Hoàng Cường',
+    fullName: 'L� Ho�ng C��ng',
     email: 'cuong.le@student.hcmute.edu.vn',
   },
   {
@@ -93,7 +100,7 @@ export const mockUsers: User[] = [
     username: '2001212348',
     password: '123456',
     role: 'SV',
-    fullName: 'Phạm Minh Đức',
+    fullName: 'Ph�m Minh �c',
     email: 'duc.pham@student.hcmute.edu.vn',
   },
   {
@@ -101,7 +108,7 @@ export const mockUsers: User[] = [
     username: '2001212349',
     password: '123456',
     role: 'SV',
-    fullName: 'Võ Thị Hương',
+    fullName: 'V� Th� H��ng',
     email: 'huong.vo@student.hcmute.edu.vn',
   },
   // Teachers
@@ -110,9 +117,9 @@ export const mockUsers: User[] = [
     username: 'gv.nguyenducthang',
     password: '123456',
     role: 'GV',
-    fullName: 'TS. Nguyễn Đức Thắng',
+    fullName: 'TS. Nguy�n �c Th�ng',
     email: 'thang.nguyen@hcmute.edu.vn',
-    faculty: 'Khoa Công nghệ Phần mềm',
+    faculty: 'Khoa C�ng ngh� Ph�n m�m',
     expertise: ['AI', 'Machine Learning', 'Data Science'],
     quota: 5,
   },
@@ -121,9 +128,9 @@ export const mockUsers: User[] = [
     username: 'gv.tranthiminh',
     password: '123456',
     role: 'GV',
-    fullName: 'PGS.TS. Trần Thị Minh',
+    fullName: 'PGS.TS. Tr�n Th� Minh',
     email: 'minh.tran@hcmute.edu.vn',
-    faculty: 'Khoa Công nghệ Phần mềm',
+    faculty: 'Khoa C�ng ngh� Ph�n m�m',
     expertise: ['Web Development', 'Mobile Development', 'Cloud Computing'],
     quota: 6,
   },
@@ -132,9 +139,9 @@ export const mockUsers: User[] = [
     username: 'gv.lequochuy',
     password: '123456',
     role: 'GV',
-    fullName: 'TS. Lê Quốc Huy',
+    fullName: 'TS. L� Qu�c Huy',
     email: 'huy.le@hcmute.edu.vn',
-    faculty: 'Khoa Công nghệ Phần mềm',
+    faculty: 'Khoa C�ng ngh� Ph�n m�m',
     expertise: ['IoT', 'Embedded Systems', 'Networking'],
     quota: 4,
   },
@@ -143,9 +150,9 @@ export const mockUsers: User[] = [
     username: 'gv.phamvankhanh',
     password: '123456',
     role: 'GV',
-    fullName: 'TS. Phạm Văn Khánh',
+    fullName: 'TS. Ph�m Vn Kh�nh',
     email: 'khanh.pham@hcmute.edu.vn',
-    faculty: 'Khoa Công nghệ Phần mềm',
+    faculty: 'Khoa C�ng ngh� Ph�n m�m',
     expertise: ['Blockchain', 'Security', 'Cryptography'],
     quota: 5,
   },
@@ -154,9 +161,9 @@ export const mockUsers: User[] = [
     username: 'gv.vothilan',
     password: '123456',
     role: 'GV',
-    fullName: 'ThS. Võ Thị Lan',
+    fullName: 'ThS. V� Th� Lan',
     email: 'lan.vo@hcmute.edu.vn',
-    faculty: 'Khoa Công nghệ Phần mềm',
+    faculty: 'Khoa C�ng ngh� Ph�n m�m',
     expertise: ['UI/UX', 'Web Development', 'Mobile Development'],
     quota: 5,
   },
@@ -166,9 +173,9 @@ export const mockUsers: User[] = [
     username: 'tbm.admin',
     password: '123456',
     role: 'TBM',
-    fullName: 'PGS.TS. Nguyễn Văn Quản',
+    fullName: 'PGS.TS. Nguy�n Vn Qu�n',
     email: 'quan.nguyen@hcmute.edu.vn',
-    faculty: 'Khoa Công nghệ Phần mềm',
+    faculty: 'Khoa C�ng ngh� Ph�n m�m',
   },
 ];
 
@@ -178,7 +185,7 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
     id: 'REG001',
     studentId: 'SV001',
     type: 'BCTT',
-    title: 'Xây dựng hệ thống quản lý thư viện sử dụng React và Node.js',
+    title: 'X�y d�ng h� th�ng qu�n l� th� vi�n s� d�ng React v� Node.js',
     field: 'Web Development',
     advisorId: 'GV002',
     reviewerId: 'GV005',
@@ -194,7 +201,7 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
     councilScore: 8.2,
     finalScore: 8.23,
     defenseDate: '2026-04-01',
-    defenseLocation: 'Phòng A101',
+    defenseLocation: 'Ph�ng A101',
     councilMinutesUrl: 'mock-url',
     revisedPdfUrl: 'mock-url',
     revisionExplanationUrl: 'mock-url',
@@ -206,7 +213,7 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
     id: 'REG002',
     studentId: 'SV001',
     type: 'KLTN',
-    title: 'Phát triển ứng dụng Mobile quản lý học tập với React Native',
+    title: 'Ph�t tri�n �ng d�ng Mobile qu�n l� h�c t�p v�i React Native',
     field: 'Mobile Development',
     advisorId: 'GV002',
     reviewerId: 'GV005',
@@ -221,21 +228,21 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
     councilScore: 8.6,
     finalScore: 8.63,
     defenseDate: '2026-04-08',
-    defenseLocation: 'Phòng B202',
+    defenseLocation: 'Ph�ng B202',
     councilMinutesUrl: 'mock-url',
     revisedPdfUrl: 'mock-url',
     revisionExplanationUrl: 'mock-url',
     advisorApprovalRevision: true,
     chairmanApprovalRevision: false,
-    reviewerComments: 'Cần bổ sung thêm phần testing và deployment',
-    councilComments: 'Nên mở rộng thêm tính năng thông báo push notification',
+    reviewerComments: 'C�n b� sung th�m ph�n testing v� deployment',
+    councilComments: 'N�n m� r�ng th�m t�nh nng th�ng b�o push notification',
     submissionDeadline: '2026-04-30',
   },
   {
     id: 'REG003',
     studentId: 'SV002',
     type: 'BCTT',
-    title: 'Nghiên cứu thuật toán Machine Learning cho dự đoán giá cổ phiếu',
+    title: 'Nghi�n c�u thu�t to�n Machine Learning cho d� o�n gi� c� phi�u',
     field: 'AI',
     advisorId: 'GV001',
     period: 'HK2-2025-2026',
@@ -246,7 +253,7 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
     id: 'REG004',
     studentId: 'SV003',
     type: 'BCTT',
-    title: 'Xây dựng hệ thống IoT giám sát môi trường',
+    title: 'X�y d�ng h� th�ng IoT gi�m s�t m�i tr��ng',
     field: 'IoT',
     advisorId: 'GV003',
     period: 'HK2-2025-2026',
@@ -260,7 +267,7 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
     id: 'REG005',
     studentId: 'SV004',
     type: 'BCTT',
-    title: 'Nghiên cứu và ứng dụng Blockchain trong quản lý chuỗi cung ứng',
+    title: 'Nghi�n c�u v� �ng d�ng Blockchain trong qu�n l� chu�i cung �ng',
     field: 'Blockchain',
     advisorId: 'GV004',
     reviewerId: 'GV001',
@@ -273,14 +280,14 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
     advisorScore: 9.0,
     reviewerScore: 8.7,
     defenseDate: '2026-04-10',
-    defenseLocation: 'Phòng C301',
+    defenseLocation: 'Ph�ng C301',
     submissionDeadline: '2026-04-20',
   },
   {
     id: 'REG006',
     studentId: 'SV005',
     type: 'BCTT',
-    title: 'Thiết kế giao diện người dùng cho ứng dụng thương mại điện tử',
+    title: 'Thi�t k� giao di�n ng��i d�ng cho �ng d�ng th��ng m�i i�n t�',
     field: 'UI/UX',
     advisorId: 'GV005',
     period: 'HK2-2025-2026',
@@ -293,7 +300,7 @@ export const mockThesisRegistrations: ThesisRegistration[] = [
 export const mockCouncils: Council[] = [
   {
     id: 'HD001',
-    name: 'Hội đồng 1 - Web & Mobile',
+    name: 'H�i �ng 1 - Web & Mobile',
     chairmanId: 'GV001',
     secretaryId: 'GV005',
     members: ['GV002', 'GV003'],
@@ -301,7 +308,7 @@ export const mockCouncils: Council[] = [
   },
   {
     id: 'HD002',
-    name: 'Hội đồng 2 - AI & IoT',
+    name: 'H�i �ng 2 - AI & IoT',
     chairmanId: 'GV002',
     secretaryId: 'GV003',
     members: ['GV001', 'GV004'],

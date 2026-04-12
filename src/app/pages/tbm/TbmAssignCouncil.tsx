@@ -33,7 +33,7 @@ export function TbmAssignCouncil() {
   const teachers = users.filter((u) => u.role === 'GV');
   const students = users.filter((u) => u.role === 'SV');
 
-  const gradedRegistrations = thesisRegistrations.filter((r) => r.type === 'KLTN' && !!r.reviewerId);
+  const gradedRegistrations = thesisRegistrations.filter((r) => r.type === 'KLTN' && Number(r.advisorScore || 0) >= 5 && Number(r.reviewerScore || 0) >= 5);
 
   const getStudentName = (studentId: string) =>
     students.find((s) => s.id === studentId)?.fullName || 'N/A';
@@ -474,3 +474,4 @@ export function TbmAssignCouncil() {
     </div>
   );
 }
+
