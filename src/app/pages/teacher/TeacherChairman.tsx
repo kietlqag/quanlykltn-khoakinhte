@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
-import { Eye, Pencil, Save, X } from 'lucide-react';
+import { Eye, FileCheck2, FileSearch, FileText, Pencil, Save, X } from 'lucide-react';
 
 interface Criterion {
   id: string;
@@ -117,6 +117,7 @@ export function TeacherChairman() {
   const handleApprove = (regId: string, approve: boolean) => {
     updateThesisRegistration(regId, {
       chairmanApprovalRevision: approve,
+      ...(approve ? {} : { advisorApprovalRevision: false }),
       status: approve ? 'completed' : 'revision_pending',
     });
     setRevisionReviewFor(null);
@@ -146,7 +147,7 @@ export function TeacherChairman() {
                 <div>Hồ sơ</div>
                 <div className="text-center">Điểm</div>
                 <div className="text-center">Trạng thái GVHD</div>
-                <div className="text-center">Chỉnh sửa</div>
+                <div className="text-left">Chỉnh sửa</div>
               </div>
 
               <div className="divide-y divide-gray-200">
@@ -162,50 +163,32 @@ export function TeacherChairman() {
                         <div className="text-sm font-semibold text-gray-900 truncate">{reg.title}</div>
                       </div>
 
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex flex-col items-start gap-1.5">
                         {reg.pdfUrl && (
                           <button
                             onClick={() => openIfUrl(reg.pdfUrl)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-200"
+                            className="inline-flex items-center gap-1.5 text-[13px] font-semibold leading-5 text-slate-700 hover:underline"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <FileText className="h-4 w-4 text-blue-600" />
                             Bài làm
                           </button>
                         )}
                         {reg.turnitinUrl && (
                           <button
                             onClick={() => openIfUrl(reg.turnitinUrl)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-200"
+                            className="inline-flex items-center gap-1.5 text-[13px] font-semibold leading-5 text-red-600 hover:underline"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <FileSearch className="h-4 w-4 text-red-500" />
                             Turnitin
                           </button>
                         )}
                         {reg.councilMinutesUrl && (
                           <button
                             onClick={() => openIfUrl(reg.councilMinutesUrl)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-100 rounded-lg text-xs font-medium text-indigo-700 hover:bg-indigo-200"
+                            className="inline-flex items-center gap-1.5 text-[13px] font-semibold leading-5 text-emerald-700 hover:underline"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <FileCheck2 className="h-4 w-4 text-emerald-600" />
                             BB hội đồng
-                          </button>
-                        )}
-                        {reg.revisedPdfUrl && (
-                          <button
-                            onClick={() => openIfUrl(reg.revisedPdfUrl)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-200"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Bài sửa
-                          </button>
-                        )}
-                        {reg.revisionExplanationUrl && (
-                          <button
-                            onClick={() => openIfUrl(reg.revisionExplanationUrl)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-200"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Giải trình
                           </button>
                         )}
                       </div>
@@ -243,43 +226,70 @@ export function TeacherChairman() {
                         </span>
                       </div>
 
-                      <div className="md:text-center">
-                        {reg.revisedPdfUrl ? (
-                          <div className="inline-flex items-center gap-2">
+                      <div className="md:text-left">
+                        <div className="flex flex-col items-start gap-2">
+                          {reg.revisedPdfUrl && (
+                            <button
+                              onClick={() => openIfUrl(reg.revisedPdfUrl)}
+                              className="inline-flex items-center gap-1.5 text-[13px] font-semibold leading-5 text-amber-700 hover:underline"
+                            >
+                              <FileText className="h-4 w-4 text-amber-600" />
+                              Bài sửa
+                            </button>
+                          )}
+                          {reg.revisionExplanationUrl && (
+                            <button
+                              onClick={() => openIfUrl(reg.revisionExplanationUrl)}
+                              className="inline-flex items-center gap-1.5 text-[13px] font-semibold leading-5 text-slate-700 hover:underline"
+                            >
+                              <FileSearch className="h-4 w-4 text-slate-600" />
+                              Giải trình
+                            </button>
+                          )}
+                          {reg.status === 'completed' ? null : reg.chairmanApprovalRevision ? null : reg.revisedPdfUrl || reg.status === 'revision_pending' ? (
                             <button
                               type="button"
                               onClick={() => setRevisionReviewFor(reg.id)}
-                              className="px-2.5 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold hover:bg-blue-700"
-                            >
-                              Xem duyệt
-                            </button>
-                            <span
-                              className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                reg.chairmanApprovalRevision ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                              className={`px-3 py-1 rounded-full text-[13px] font-semibold leading-5 ${
+                                reg.chairmanApprovalRevision
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  : 'bg-blue-600 text-white hover:bg-blue-700'
                               }`}
                             >
                               {reg.chairmanApprovalRevision ? 'Đã duyệt' : 'Chờ duyệt'}
-                            </span>
-                          </div>
-                        ) : reg.status === 'revision_pending' ? (
-                          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                            Đã yêu cầu
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateThesisRegistration(reg.id, {
-                                status: 'revision_pending',
-                                chairmanApprovalRevision: false,
-                              });
-                              alert('Đã yêu cầu sinh viên chỉnh sửa');
-                            }}
-                            className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold hover:bg-amber-200"
-                          >
-                            Yêu cầu chỉnh sửa
-                          </button>
-                        )}
+                            </button>
+                          ) : (
+                            <div className="flex flex-col items-start gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateThesisRegistration(reg.id, {
+                                    status: 'revision_pending',
+                                    chairmanApprovalRevision: false,
+                                  });
+                                  alert('Đã yêu cầu sinh viên chỉnh sửa');
+                                }}
+                                className="rounded-full bg-amber-100 px-2.5 py-1 text-[13px] font-semibold leading-5 text-amber-700 hover:bg-amber-200"
+                              >
+                                Yêu cầu chỉnh sửa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateThesisRegistration(reg.id, {
+                                    status: 'completed',
+                                    advisorApprovalRevision: true,
+                                    chairmanApprovalRevision: true,
+                                  });
+                                  alert('Đã hoàn thành báo cáo');
+                                }}
+                                className="rounded-full bg-emerald-100 px-2.5 py-1 text-[13px] font-semibold leading-5 text-emerald-700 hover:bg-emerald-200"
+                              >
+                                Hoàn thành báo cáo
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -392,61 +402,66 @@ export function TeacherChairman() {
               if (!reg) return null;
               return (
                 <>
-                  <div className="flex items-start justify-between border-b border-gray-200 px-6 py-5">
+                  <div className="flex items-start justify-between border-b border-gray-200 bg-gray-50 px-6 py-5">
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Duyệt bài chỉnh sửa</h2>
-                      <p className="mt-1 text-sm text-gray-600">{reg.title}</p>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Duyệt chỉnh sửa</p>
+                      <h2 className="mt-1 text-xl font-semibold text-gray-900">{reg.title}</h2>
+                      <p className="mt-1 text-sm text-gray-600">{reg.studentId}</p>
                     </div>
                     <button
                       onClick={() => setRevisionReviewFor(null)}
-                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
                     >
                       <X className="h-5 w-5" />
                     </button>
                   </div>
 
-                  <div className="px-6 py-6 space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => reg.revisedPdfUrl && openIfUrl(reg.revisedPdfUrl)}
-                        disabled={!reg.revisedPdfUrl}
-                        className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        Xem bài sửa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => reg.revisionExplanationUrl && openIfUrl(reg.revisionExplanationUrl)}
-                        disabled={!reg.revisionExplanationUrl}
-                        className="inline-flex items-center gap-1 rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        Xem giải trình
-                      </button>
+                  <div className="space-y-5 px-6 py-6">
+                    <div className="rounded-xl border border-gray-200 bg-white p-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => reg.revisedPdfUrl && openIfUrl(reg.revisedPdfUrl)}
+                          disabled={!reg.revisedPdfUrl}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:bg-blue-100"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Xem bài sửa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => reg.revisionExplanationUrl && openIfUrl(reg.revisionExplanationUrl)}
+                          disabled={!reg.revisionExplanationUrl}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-semibold leading-5 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Xem giải trình
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(reg.id, true)}
-                        disabled={!reg.advisorApprovalRevision}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
-                      >
-                        Duyệt
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(reg.id, false)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700"
-                      >
-                        Không duyệt
-                      </button>
-                      {!reg.advisorApprovalRevision && (
-                        <span className="text-sm text-amber-600 self-center">GVHD Chưa duyệt</span>
-                      )}
-                    </div>
+                    {reg.advisorApprovalRevision ? (
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(reg.id, true)}
+                          className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-[13px] font-semibold leading-5 text-white shadow-sm hover:bg-emerald-700"
+                        >
+                          Duyệt chỉnh sửa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(reg.id, false)}
+                          className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-[13px] font-semibold leading-5 text-rose-700 hover:bg-rose-100"
+                        >
+                          Không duyệt
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end">
+                        <span className="text-sm font-medium text-amber-600">GVHD Chưa duyệt</span>
+                      </div>
+                    )}
                   </div>
                 </>
               );

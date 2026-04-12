@@ -997,12 +997,28 @@ export function StudentStatus() {
                 {kltn.pdfUrl ? (
                   <button
                     onClick={() => window.open(kltn.pdfUrl, '_blank', 'noopener,noreferrer')}
-                    className="text-blue-600 hover:text-blue-700 flex w-fit items-center gap-1"
+                    className="flex w-fit items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
                   >
                     <Eye className="w-4 h-4" /> {I18N.fileReport}
                   </button>
                 ) : (
                   <p>-</p>
+                )}
+                {kltn.revisedPdfUrl && (
+                  <button
+                    onClick={() => window.open(kltn.revisedPdfUrl, '_blank', 'noopener,noreferrer')}
+                    className="flex w-fit items-center gap-1 text-sm font-medium text-amber-600 hover:text-amber-700"
+                  >
+                    <Eye className="w-4 h-4" /> {I18N.uploadLabelRevision}
+                  </button>
+                )}
+                {kltn.revisionExplanationUrl && (
+                  <button
+                    onClick={() => window.open(kltn.revisionExplanationUrl, '_blank', 'noopener,noreferrer')}
+                    className="flex w-fit items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                  >
+                    <Eye className="w-4 h-4" /> {I18N.uploadLabelExplain}
+                  </button>
                 )}
               </div>
             </div>

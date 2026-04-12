@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
-import { Eye, Pencil, Save, X } from 'lucide-react';
+import { Download, Eye, Pencil, Save, X } from 'lucide-react';
 
 interface Criterion {
   id: string;
@@ -82,6 +82,26 @@ export function TeacherCouncil() {
     setScoringFor(null);
     setCriteriaScores({});
     setCouncilCommentDraft('');
+  };
+
+  const triggerDownload = async (url?: string, fallbackName = 'download.pdf') => {
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Không tải được file.');
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fallbackName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error(error);
+      alert('Tải file thất bại, vui lòng thử lại.');
+    }
   };
 
   const scoringCriteria = criteria.length > 0 ? criteria : COUNCIL_DEFAULT_CRITERIA;

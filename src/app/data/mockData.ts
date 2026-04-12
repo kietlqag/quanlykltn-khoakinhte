@@ -66,6 +66,7 @@ export interface Council {
   period: string;
   location?: string;
   time?: string;
+  isFinished?: boolean;
 }
 
 // Mock users

@@ -122,6 +122,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           period: String(data.period || ''),
           location: String(data.location || '') || undefined,
           time: String(data.time || '') || undefined,
+          isFinished: Boolean(data.isFinished),
         };
       });
       setCouncils(mappedCouncils);
@@ -541,6 +542,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const addCouncil = (council: Council) => {
     void setDoc(doc(db, 'councils', council.id), {
       ...council,
+      isFinished: Boolean(council.isFinished),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }).catch((error) => console.error('Add council failed:', error));

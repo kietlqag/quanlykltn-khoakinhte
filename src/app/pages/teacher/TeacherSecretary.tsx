@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { db } from '../../../lib/firebase';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { FileText, X } from 'lucide-react';
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -396,20 +396,33 @@ export function TeacherSecretary() {
   };
 
   const handleToggleScoreLock = (regId: string, nextLocked: boolean) => {
+    const reg = councilStudents.find((item) => item.id === regId);
+    const councilFinished = Boolean(councils.find((c) => c.id === reg?.councilId)?.isFinished);
+    if (councilFinished) return;
     updateThesisRegistration(regId, { scoreLocked: nextLocked });
     alert(nextLocked ? 'Đã khóa điểm' : 'Đã mở khóa điểm');
   };
 
-  const handleFinishCouncil = (councilId: string) => {
+  const handleFinishCouncil = async (councilId: string) => {
+    const targetCouncil = councils.find((c) => c.id === councilId);
+    if (targetCouncil?.isFinished) return;
     const students = councilStudents.filter((r) => r.councilId === councilId);
     students.forEach((reg) => {
-      if (!reg.councilMinutesUrl) return;
       const finalScoreNumber = calculateFinalScoreNumber(reg);
-      if (finalScoreNumber === null) return;
       updateThesisRegistration(reg.id, {
-        finalScore: finalScoreNumber,
-        status: finalScoreNumber >= 5 ? 'completed' : 'defended',
+        scoreLocked: true,
+        ...(finalScoreNumber !== null
+          ? {
+              finalScore: finalScoreNumber,
+              status: finalScoreNumber >= 5 ? 'completed' : 'defended',
+            }
+          : {}),
       });
+    });
+    await updateDoc(doc(db, 'councils', councilId), {
+      isFinished: true,
+      finishedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
     alert('Đã kết thúc hội đồng');
   };
@@ -421,14 +434,22 @@ export function TeacherSecretary() {
         : [{ id: '__empty__', name: 'Chưa có hội đồng' }]
       ).map((council) => {
         const students = council.id === '__empty__' ? [] : councilStudents.filter((r) => r.councilId === council.id);
+        const councilFinished = Boolean(council.id !== '__empty__' && councils.find((c) => c.id === council.id)?.isFinished);
 
         return (
           <div key={council.id}>
-            <div className="inline-flex px-4 py-2 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold mb-3">
-              {council.name}
+            <div className="mb-3 inline-flex items-center gap-2">
+              <div className="inline-flex px-4 py-2 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
+                {council.name}
+              </div>
+              {councilFinished && (
+                <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-semibold leading-5 text-emerald-700">
+                  Đã hoàn thành
+                </span>
+              )}
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ${councilFinished ? 'opacity-85' : ''}`}>
               <div className="hidden md:grid md:grid-cols-[2fr_2.7fr_2.4fr_1fr_1.5fr] gap-4 px-6 py-3 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 <div>Sinh viên</div>
                 <div>Bảng điểm</div>
@@ -478,10 +499,14 @@ export function TeacherSecretary() {
                       <div className="md:text-center">
                         <button
                           onClick={() => {
+                            if (councilFinished) return;
                             setEditingMinutes(reg.id);
                             setCouncilComments(reg.councilComments || '');
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 rounded-full text-xs font-semibold text-red-700 hover:bg-red-200"
+                          disabled={councilFinished}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 rounded-full text-xs font-semibold text-red-700 hover:bg-red-200 ${
+                            councilFinished ? 'cursor-not-allowed opacity-60' : ''
+                          }`}
                         >
                           <FileText className="w-3.5 h-3.5" />
                           {reg.councilMinutesUrl ? 'Sửa' : 'Tạo'}
@@ -492,11 +517,12 @@ export function TeacherSecretary() {
                         <button
                           type="button"
                           onClick={() => handleToggleScoreLock(reg.id, !Boolean(reg.scoreLocked))}
+                          disabled={councilFinished}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
                             reg.scoreLocked
                               ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                               : 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-                          }`}
+                          } ${councilFinished ? 'cursor-not-allowed opacity-60' : ''}`}
                         >
                           {reg.scoreLocked ? 'Mở khóa điểm' : 'Khóa điểm'}
                         </button>
@@ -512,7 +538,7 @@ export function TeacherSecretary() {
               </div>
             </div>
 
-            {council.id !== '__empty__' && (
+            {council.id !== '__empty__' && !councilFinished && (
               <div className="mt-3 flex justify-end">
                 <button
                   onClick={() => handleFinishCouncil(council.id)}
@@ -533,6 +559,7 @@ export function TeacherSecretary() {
               const reg = councilStudents.find((item) => item.id === editingMinutes);
               if (!reg) return null;
               const activeCouncil = councils.find((c) => c.id === reg.councilId);
+              const councilFinished = Boolean(activeCouncil?.isFinished);
               const tv1Id = activeCouncil?.members?.[0];
               const tv2Id = activeCouncil?.members?.[1];
               const chairmanComment = reg.chairmanComments || 'Chưa có góp ý';
@@ -593,8 +620,9 @@ export function TeacherSecretary() {
                       <textarea
                         value={councilComments}
                         onChange={(e) => setCouncilComments(e.target.value)}
+                        disabled={councilFinished}
                         rows={6}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100"
                         placeholder="Nhập yêu cầu chỉnh sửa cho sinh viên..."
                       />
                     </div>
@@ -603,7 +631,8 @@ export function TeacherSecretary() {
                     <div className="flex gap-2 pt-4">
                       <button
                         onClick={() => handleSaveMinutes(reg.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                        disabled={councilFinished}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                       >
                         Lưu biên bản
                       </button>
