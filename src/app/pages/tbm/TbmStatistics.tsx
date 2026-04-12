@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useData } from '../../contexts/DataContext';
 import { CheckCircle, Clock } from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -74,7 +74,7 @@ export function TbmStatistics() {
                   <td className="px-4 py-3 text-gray-700">{row.period || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-blue-100 px-2 py-1 text-base font-bold text-blue-700">
-                      {typeof row.finalScore === 'number' ? row.finalScore.toFixed(1) : '0'}
+                      {typeof row.finalScore === 'number' ? row.finalScore.toFixed(2) : '0.00'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">

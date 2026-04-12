@@ -282,6 +282,10 @@ export function TeacherSecretary() {
     return digits.slice(0, 6);
   };
 
+  const formatScore = (score?: number | null) => {
+    return typeof score === 'number' ? score.toFixed(2) : '-';
+  };
+
   const calculateFinalScore = (reg: any): string => {
     const scores = [reg.advisorScore, reg.reviewerScore, reg.councilScore].filter((s) => s !== undefined);
     return scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2) : 'N/A';
@@ -488,11 +492,11 @@ export function TeacherSecretary() {
                           <span className="text-center font-semibold text-gray-500">CT</span>
                           <span className="text-center font-semibold text-gray-500">TV1</span>
                           <span className="text-center font-semibold text-gray-500">TV2</span>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{reg.advisorScore ?? '-'}</span>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{reg.reviewerScore ?? '-'}</span>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{chairmanScore ?? '-'}</span>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{tv1Score ?? '-'}</span>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{tv2Score ?? '-'}</span>
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{formatScore(reg.advisorScore)}</span>
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{formatScore(reg.reviewerScore)}</span>
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{formatScore(chairmanScore)}</span>
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{formatScore(tv1Score)}</span>
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-full text-center">{formatScore(tv2Score)}</span>
                         </div>
                       </div>
 

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
@@ -674,7 +674,7 @@ export function StudentStatus() {
           <div className="rounded-lg border border-gray-200 p-4">
             <p className="font-semibold text-gray-900 mb-2">{I18N.sectionScore}</p>
             <p className="mb-1 inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-sm font-semibold text-blue-700">
-              {I18N.scoreLabel} {completionScore !== null ? completionScore.toFixed(1) : '-'}
+              {I18N.scoreLabel} {completionScore !== null ? completionScore.toFixed(2) : '-'}
             </p>
             <p className="text-sm font-semibold text-blue-700">
               {I18N.scoreDone}
@@ -813,7 +813,7 @@ export function StudentStatus() {
                 {I18N.lblAdvisor} {kltnAdvisor.name}{kltnAdvisor.email ? ` (${kltnAdvisor.email})` : ''}
               </p>
               <p className={`${typeof kltn.advisorScore === 'number' ? 'text-green-700' : 'text-amber-700'} font-medium mt-1`}>
-                {typeof kltn.advisorScore === 'number' ? `${I18N.advisorGraded}: ${kltn.advisorScore.toFixed(1)}` : I18N.advisorGrading}
+                {typeof kltn.advisorScore === 'number' ? `${I18N.advisorGraded}: ${kltn.advisorScore.toFixed(2)}` : I18N.advisorGrading}
               </p>
               
               <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Nhận xét:</span> {kltn.advisorComments || 'Chưa có nhận xét'}</p>
@@ -824,7 +824,7 @@ export function StudentStatus() {
                 Giảng viên phản biện: {kltnReviewer.name}{kltnReviewer.email ? ` (${kltnReviewer.email})` : ''}
               </p>
               <p className={`${typeof kltn.reviewerScore === 'number' ? 'text-green-700' : 'text-amber-700'} font-medium mt-1`}>
-                {typeof kltn.reviewerScore === 'number' ? `${I18N.reviewerGraded}: ${kltn.reviewerScore.toFixed(1)}` : I18N.reviewerGrading}
+                {typeof kltn.reviewerScore === 'number' ? `${I18N.reviewerGraded}: ${kltn.reviewerScore.toFixed(2)}` : I18N.reviewerGrading}
               </p>
               
               <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Nhận xét:</span> {kltn.reviewerComments || 'Chưa có nhận xét'}</p>
@@ -1026,7 +1026,7 @@ export function StudentStatus() {
           <div className="rounded-lg border border-gray-200 p-4">
             <p className="font-semibold text-gray-900 mb-2">{I18N.sectionScore}</p>
             <p className="mb-1 inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-sm font-semibold text-blue-700">
-              {I18N.scoreLabel} {kltnScore !== null ? kltnScore.toFixed(1) : '-'}
+              {I18N.scoreLabel} {kltnScore !== null ? kltnScore.toFixed(2) : '-'}
             </p>
             <p className="text-sm font-semibold text-blue-700">{I18N.scoreDone}</p>
           </div>

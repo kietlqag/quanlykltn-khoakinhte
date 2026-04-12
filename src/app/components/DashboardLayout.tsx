@@ -59,7 +59,6 @@ export function DashboardLayout() {
         ];
       }
 
-      // For GV, /dashboard already shows profile info.
       return teacherMenus;
     }
 
@@ -75,7 +74,7 @@ export function DashboardLayout() {
     })?.label || 'Bảng điều khiển';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 font-sans">
       <aside className="hcmute-scrollbar fixed top-0 left-0 h-full w-64 bg-gradient-to-b from-[#214E9A] to-[#163B7A] text-white flex flex-col overflow-y-auto shadow-lg">
         <div className="p-5 bg-[#214E9A] border-b border-white/15 flex items-center justify-center">
           <img

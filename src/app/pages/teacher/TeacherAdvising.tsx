@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { BookOpen, CheckCircle, X, Upload, UploadCloud, Eye, Save, Users, Search, Download, Pencil, Settings, FileSearch, FileText } from 'lucide-react';
@@ -672,7 +672,7 @@ export function TeacherAdvising() {
                             : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                         }`}
                       >
-                        {reg.advisorScore}
+                        {reg.advisorScore.toFixed(2)}
                       </button>
                     ) : scoringFor === reg.id ? (
                       <div className="inline-flex items-center gap-1">

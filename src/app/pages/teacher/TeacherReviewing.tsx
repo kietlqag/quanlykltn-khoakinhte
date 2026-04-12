@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -264,7 +264,7 @@ export function TeacherReviewing() {
                         reg.scoreLocked ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                       }`}
                     >
-                      {reg.reviewerScore}
+                      {reg.reviewerScore.toFixed(2)}
                     </button>
                   ) : (
                     <button

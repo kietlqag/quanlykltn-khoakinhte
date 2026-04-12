@@ -212,7 +212,7 @@ export function TeacherCouncil() {
                     title={reg.scoreLocked ? 'Điểm đã bị khóa' : 'Chấm điểm'}
                   >
                     {typeof (user?.id ? reg.councilMemberScores?.[user.id] : undefined) === 'number' ? (
-                      Number(reg.councilMemberScores?.[user.id]).toFixed(1)
+                      Number(reg.councilMemberScores?.[user.id]).toFixed(2)
                     ) : (
                       <span className="inline-flex items-center gap-1">
                         <Pencil className="h-3 w-3" />

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -207,7 +207,7 @@ export function TeacherChairman() {
                           }`}
                           title={reg.scoreLocked ? 'Điểm đã bị khóa' : 'Chấm điểm'}
                         >
-                          {typeof reg.chairmanScore === 'number' ? reg.chairmanScore.toFixed(1) : (
+                          {typeof reg.chairmanScore === 'number' ? reg.chairmanScore.toFixed(2) : (
                             <span className="inline-flex items-center gap-1">
                               <Pencil className="h-3 w-3" />
                               Chấm

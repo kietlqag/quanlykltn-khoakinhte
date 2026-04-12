@@ -122,10 +122,10 @@ export function StudentDashboard() {
                     <span className="text-sm font-medium text-gray-700">{getStatusText(reg.status)}</span>
                   </div>
                 </div>
-                {reg.finalScore && (
+                {typeof reg.finalScore === 'number' && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className="text-sm text-gray-600">
-                      Điểm tổng kết: <span className="font-bold text-green-600">{reg.finalScore}</span>
+                      Điểm tổng kết: <span className="font-bold text-green-600">{reg.finalScore.toFixed(2)}</span>
                     </p>
                   </div>
                 )}
