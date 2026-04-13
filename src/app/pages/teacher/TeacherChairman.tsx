@@ -285,7 +285,7 @@ export function TeacherChairman() {
                                 }}
                                 className="rounded-full bg-emerald-100 px-2.5 py-1 text-[13px] font-semibold leading-5 text-emerald-700 hover:bg-emerald-200"
                               >
-                                Hoàn thành báo cáo
+                                Hoàn thành
                               </button>
                             </div>
                           )}

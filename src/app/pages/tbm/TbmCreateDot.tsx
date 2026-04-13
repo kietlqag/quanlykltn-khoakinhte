@@ -71,7 +71,7 @@ export function TbmCreateDot() {
           maDot: String(data.maDot || '').trim(),
           tenDot: String(data.tenDot || '').trim(),
           dot: String(data.dot || '').trim(),
-          loaiDeTai: String(data.loaiDeTai || data.type || 'BCTT').toUpperCase().includes('KLTN')
+          loaiDeTai: String(data.loaiDeTai || data.loaidetai || data.type || 'BCTT').toUpperCase().includes('KLTN')
             ? 'KLTN'
             : 'BCTT',
           major: String(data.major || '').trim(),
