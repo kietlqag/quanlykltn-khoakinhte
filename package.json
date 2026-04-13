@@ -7,6 +7,8 @@
     "build": "vite build",
     "dev": "vite",
     "import:sheet": "node scripts/import-sheet-to-firestore.mjs",
+    "migrate:users-ms": "node scripts/migrate-user-ids-to-ms.mjs",
+    "migrate:mirror-ids": "node scripts/migrate-mirror-fields-to-ids.mjs",
     "reset:data": "node scripts/reset-firestore-keep-users.mjs",
     "build:clean-data": "node scripts/build-clean-workbook.mjs",
     "build:test-data": "node scripts/build-clean-workbook.mjs Data.xlsx Data.test.xlsx test"

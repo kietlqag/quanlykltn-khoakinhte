@@ -332,6 +332,12 @@ export function StudentStatus() {
   };
 
   const openSubmitModal = (regId: string) => {
+    const reg = myRegistrations.find((item) => item.id === regId);
+    if (!reg) return;
+    if (isPeriodEnded(reg)) {
+      alert(lateSubmitMessage);
+      return;
+    }
     setSubmitModalRegId(regId);
     setSubmissionFiles({ pdf: null, internship: null });
   };
@@ -340,6 +346,8 @@ export function StudentStatus() {
     setSubmitModalRegId(null);
     setSubmissionFiles({ pdf: null, internship: null });
   };
+
+  const lateSubmitMessage = 'Đã quá hạn nộp báo cáo cho đợt này.';
 
   const isPdfFile = (file: File) =>
     file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -363,6 +371,11 @@ export function StudentStatus() {
   };
 
   const handleSubmitRegistrationFiles = async (reg: any) => {
+    if (isPeriodEnded(reg)) {
+      alert(lateSubmitMessage);
+      return;
+    }
+
     if (!submissionFiles.pdf) {
       alert(I18N.errChoosePdf);
       return;
@@ -403,6 +416,11 @@ export function StudentStatus() {
   };
 
   const handleSubmitKltnDraft = async (reg: any) => {
+    if (isPeriodEnded(reg)) {
+      alert(lateSubmitMessage);
+      return;
+    }
+
     if (!submissionFiles.pdf) {
       alert(I18N.kltnChooseDraft);
       return;
@@ -488,6 +506,7 @@ export function StudentStatus() {
   const advisor = getAdvisorInfo(bctt?.advisorId || '');
   const regDate = bctt?.registeredAt || '-';
   const executionDeadline = bctt ? getExecutionDeadline(bctt) : '';
+  const bcttDeadlinePassed = bctt ? isPeriodEnded(bctt) : false;
   const isPending = bctt?.status === 'pending';
   const isCompleted = bctt?.status === 'completed';
   const isInProgress = Boolean(bctt) && !isPending && !isCompleted;
@@ -501,6 +520,7 @@ export function StudentStatus() {
   const kltnAdvisor = getAdvisorInfo(kltn?.advisorId || '');
   const kltnReviewer = getAdvisorInfo(kltn?.reviewerId || '');
   const kltnDeadline = kltn ? getExecutionDeadline(kltn) : '';
+  const kltnDeadlinePassed = kltn ? isPeriodEnded(kltn) : false;
   const kltnStatus = String(kltn?.status || '');
   const kltnIsPending = kltnStatus === 'pending';
   const kltnIsDoing = kltnStatus === 'advisor_approved';
@@ -604,11 +624,15 @@ export function StudentStatus() {
           <div className="rounded-lg border border-gray-200 p-4">
             <p className="font-semibold text-gray-900 mb-2">{I18N.sectionSubmit}</p>
             <p className="text-sm text-gray-600 mb-4">{I18N.submitNote}</p>
+            {bcttDeadlinePassed && (
+              <p className="mb-3 text-sm font-medium text-rose-700">{lateSubmitMessage}</p>
+            )}
 
             {!bctt.pdfUrl ? (
               <button
                 onClick={() => openSubmitModal(bctt.id)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700"
+                disabled={bcttDeadlinePassed}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
               >
                 {I18N.submitOfficial}
               </button>
@@ -745,12 +769,15 @@ export function StudentStatus() {
           <div className="rounded-lg border border-gray-200 p-4">
             <p className="font-semibold text-gray-900 mb-2">{I18N.kltnSubmitFrame}</p>
             <p className="text-sm text-gray-600 mb-3">Cú pháp đặt tên file: {I18N.kltnSubmitHint}</p>
+            {kltnDeadlinePassed && (
+              <p className="mb-3 text-sm font-medium text-rose-700">{lateSubmitMessage}</p>
+            )}
             {!kltn.pdfUrl ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button
                   type="button"
                   onClick={() => openSubmitModal(kltn.id)}
-                  disabled={isUploading}
+                  disabled={isUploading || kltnDeadlinePassed}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 >
                   {I18N.submitOfficial}
@@ -1056,6 +1083,7 @@ export function StudentStatus() {
               if (!activeReg) return null;
 
               const isKltnModal = activeReg.type === 'KLTN';
+              const isLateSubmit = isPeriodEnded(activeReg);
               const canSubmit = isKltnModal
                 ? Boolean(submissionFiles.pdf)
                 : Boolean(submissionFiles.pdf) && Boolean(submissionFiles.internship);
@@ -1166,7 +1194,7 @@ export function StudentStatus() {
                     </button>
                     <button
                       onClick={() => (isKltnModal ? handleSubmitKltnDraft(activeReg) : handleSubmitRegistrationFiles(activeReg))}
-                      disabled={!canSubmit || isUploading}
+                      disabled={!canSubmit || isUploading || isLateSubmit}
                       className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                     >
                       {isUploading ? I18N.uploading : I18N.submitOfficial}
@@ -1181,6 +1209,8 @@ export function StudentStatus() {
     </div>
   );
 }
+
+
 
 
 

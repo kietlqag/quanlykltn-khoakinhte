@@ -19,6 +19,7 @@ import { TbmTeacherApproval } from './pages/tbm/TbmTeacherApproval';
 import { TbmAssignReviewer } from './pages/tbm/TbmAssignReviewer';
 import { TbmAssignCouncil } from './pages/tbm/TbmAssignCouncil';
 import { TbmStatistics } from './pages/tbm/TbmStatistics';
+import { TbmCreateDot } from './pages/tbm/TbmCreateDot';
 
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -191,6 +192,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute role="TBM">
             <TbmStatistics />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'create-dot',
+        element: (
+          <ProtectedRoute role="TBM">
+            <TbmCreateDot />
           </ProtectedRoute>
         ),
       },

@@ -42,6 +42,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
+    const slugify = (input: string) =>
+      String(input || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
     const normalizeRole = (role: string): User['role'] => {
       const normalized = String(role || '').trim().toUpperCase();
       if (normalized === 'SV' || normalized === 'STUDENT') return 'SV';
@@ -93,6 +102,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const data = d.data();
         const major = String(data.major || '').trim();
         const heDaoTao = String(data.heDaoTao || data.hedaotao || '').trim();
+        const ms = String(data.ms || data.MS || '').trim();
+        const msv = String(data.msv || data.MSV || data.mssv || data.MSSV || '').trim();
+        const mgv = String(data.mgv || data.MGV || data.magv || data.MaGV || '').trim();
         return {
           id: d.id,
           username: String(data.email || '').trim().toLowerCase(),
@@ -100,6 +112,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           role: normalizeRole(String(data.role || 'SV')),
           fullName: String(data.name || '').trim(),
           email: String(data.email || '').trim().toLowerCase(),
+          ms: ms || undefined,
+          msv: msv || undefined,
+          mgv: mgv || undefined,
           faculty: String(data.faculty || '').trim() || undefined,
           expertise: major ? [major] : [],
           heDaoTao: heDaoTao || undefined,
@@ -230,28 +245,43 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         if (topicsSnap.empty) return;
 
         const emailToUserId = new Map<string, string>();
+        const slugEmailToUserId = new Map<string, string>();
+        const existingUserIds = new Set<string>();
         usersSnap.docs.forEach((d) => {
+          existingUserIds.add(d.id);
           const email = String(d.data().email || '').trim().toLowerCase();
-          if (email) emailToUserId.set(email, d.id);
+          if (email) {
+            emailToUserId.set(email, d.id);
+            slugEmailToUserId.set(slugify(email), d.id);
+          }
         });
+
+        const resolveUserId = (rawValue: unknown): string => {
+          const raw = String(rawValue || '').trim();
+          if (!raw) return '';
+          const normalizedEmail = raw.toLowerCase();
+          if (emailToUserId.has(normalizedEmail)) return emailToUserId.get(normalizedEmail) || '';
+          if (slugEmailToUserId.has(normalizedEmail)) return slugEmailToUserId.get(normalizedEmail) || '';
+          if (existingUserIds.has(raw)) return raw;
+          return raw;
+        };
 
         const statusByStudentAndType = new Map<string, Record<string, unknown>>();
         statusSnap.docs.forEach((d) => {
           const data = d.data();
-          const emailSV = String(data.emailsv || '').trim().toLowerCase();
-          const loai = mapLoaiDetai(String(data.loaidetai || 'BCTT'));
-          if (emailSV) {
-            statusByStudentAndType.set(`${emailSV}__${loai}`, data);
+          const studentId = resolveUserId(data.studentId ?? data.emailSV ?? data.emailsv);
+          const loai = mapLoaiDetai(String(data.type ?? data.loaiDeTai ?? data.loaidetai ?? 'BCTT'));
+          if (studentId) {
+            statusByStudentAndType.set(`${studentId}__${loai}`, data);
           }
         });
 
         for (const topicDoc of topicsSnap.docs) {
           const data = topicDoc.data();
-          const emailSV = String(data.emailsv || '').trim().toLowerCase();
-          const loai = mapLoaiDetai(String(data.loaidetai || 'BCTT'));
-          const statusData = statusByStudentAndType.get(`${emailSV}__${loai}`) || {};
-          const studentId = emailToUserId.get(emailSV) || emailSV;
-          const advisorId = emailToUserId.get(String(statusData.emailgv || '').trim().toLowerCase()) || '';
+          const studentId = resolveUserId(data.studentId ?? data.emailSV ?? data.emailsv);
+          const loai = mapLoaiDetai(String(data.type ?? data.loaiDeTai ?? data.loaidetai ?? 'BCTT'));
+          const statusData = statusByStudentAndType.get(`${studentId}__${loai}`) || {};
+          const advisorId = resolveUserId(statusData.advisorId ?? statusData.emailGV ?? statusData.emailgv);
 
           await setDoc(
             doc(db, 'thesis_registrations', topicDoc.id),
@@ -411,27 +441,34 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
           const topicRef = doc(collection(db, 'tendetai'));
           tx.set(topicRef, {
-            emailSV: registration.studentId,
+            studentId: registration.studentId,
             tendetai: registration.title,
             dothk: registration.period,
-            loaidetai: registration.type,
+            type: registration.type,
             version: 'v1',
             linkbai: '',
             linkxacnhan: '',
+            // Backward compatibility for legacy flows still reading old field names.
+            emailSV: registration.studentId,
+            loaidetai: registration.type,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
 
           const statusRef = doc(collection(db, 'trangthaidetai'));
           tx.set(statusRef, {
-            emailSV: registration.studentId,
-            emailGV: registration.advisorId,
+            studentId: registration.studentId,
+            advisorId: registration.advisorId,
             role: 'SV',
             trangthaiduyet: 'pending',
-            loaidetai: registration.type,
+            type: registration.type,
             end: registration.submissionDeadline || null,
             gvhdok: false,
             cthdok: false,
+            // Backward compatibility for legacy flows still reading old field names.
+            emailSV: registration.studentId,
+            emailGV: registration.advisorId,
+            loaidetai: registration.type,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -443,6 +480,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }
     })();
+  };
+
+  const findMirroredTopicDoc = async (studentId: string, type: 'BCTT' | 'KLTN') => {
+    const byNewQuery = query(
+      collection(db, 'tendetai'),
+      where('studentId', '==', studentId),
+      where('type', '==', type),
+      limit(1),
+    );
+    const byNewSnap = await getDocs(byNewQuery);
+    if (!byNewSnap.empty) return byNewSnap.docs[0];
+
+    const byLegacyQuery = query(
+      collection(db, 'tendetai'),
+      where('emailSV', '==', studentId),
+      where('loaidetai', '==', type),
+      limit(1),
+    );
+    const byLegacySnap = await getDocs(byLegacyQuery);
+    return byLegacySnap.empty ? null : byLegacySnap.docs[0];
   };
 
   const updateThesisRegistration = (id: string, updates: Partial<ThesisRegistration>) => {
@@ -470,18 +527,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
           const titleOrTypeChanged = updates.title || updates.type || updates.period;
           if (titleOrTypeChanged) {
-            const topicQuery = query(
-              collection(db, 'tendetai'),
-              where('emailSV', '==', current.studentId),
-              where('loaidetai', '==', current.type),
-              limit(1),
-            );
-            const topicSnap = await getDocs(topicQuery);
-            if (!topicSnap.empty) {
-              tx.update(topicSnap.docs[0].ref, {
+            const topicDoc = await findMirroredTopicDoc(current.studentId, current.type);
+            if (topicDoc) {
+              tx.update(topicDoc.ref, {
                 tendetai: updates.title ?? current.title,
-                loaidetai: updates.type ?? current.type,
+                type: updates.type ?? current.type,
                 dothk: updates.period ?? current.period,
+                // Keep legacy key in sync during transition.
+                loaidetai: updates.type ?? current.type,
                 updatedAt: serverTimestamp(),
               });
             }
@@ -493,15 +546,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             mirroredTopicUpdates.linkxacnhan = updates.internshipCertUrl;
 
           if (Object.keys(mirroredTopicUpdates).length > 0) {
-            const topicQuery = query(
-              collection(db, 'tendetai'),
-              where('emailSV', '==', current.studentId),
-              where('loaidetai', '==', current.type),
-              limit(1),
-            );
-            const topicSnap = await getDocs(topicQuery);
-            if (!topicSnap.empty) {
-              tx.update(topicSnap.docs[0].ref, {
+            const topicDoc = await findMirroredTopicDoc(current.studentId, current.type);
+            if (topicDoc) {
+              tx.update(topicDoc.ref, {
                 ...mirroredTopicUpdates,
                 updatedAt: serverTimestamp(),
               });
@@ -521,6 +568,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const payload: Record<string, unknown> = {};
     if (typeof updates.fullName === 'string') payload.name = updates.fullName;
     if (typeof updates.email === 'string') payload.email = updates.email;
+    if (typeof updates.ms === 'string') payload.ms = updates.ms;
+    if (typeof updates.msv === 'string') payload.msv = updates.msv;
+    if (typeof updates.mgv === 'string') payload.mgv = updates.mgv;
     if (typeof updates.faculty === 'string') payload.faculty = updates.faculty;
     if (typeof updates.heDaoTao === 'string') payload.heDaoTao = updates.heDaoTao;
     if (Array.isArray(updates.expertise)) payload.expertise = updates.expertise;

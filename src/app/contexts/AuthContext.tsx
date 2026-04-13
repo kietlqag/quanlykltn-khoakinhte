@@ -36,6 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const major = String(data.major ?? '').trim();
     const heDaoTao = String(data.heDaoTao ?? data.hedaotao ?? '').trim();
     const role = normalizeRole(String(data.role ?? 'SV'));
+    const ms = String(data.ms ?? data.MS ?? '').trim();
+    const msv = String(data.msv ?? data.MSV ?? data.mssv ?? data.MSSV ?? '').trim();
+    const mgv = String(data.mgv ?? data.MGV ?? data.magv ?? data.MaGV ?? '').trim();
     const quotaValue = data.quota;
 
     return {
@@ -45,6 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role,
       fullName,
       email,
+      ms: ms || undefined,
+      msv: msv || undefined,
+      mgv: mgv || undefined,
       faculty: faculty || undefined,
       expertise: major ? [major] : [],
       heDaoTao: heDaoTao || undefined,
@@ -65,21 +71,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    try {
-      const storedUser = sessionStorage.getItem('currentUser');
-      if (!storedUser) {
-        setUser(null);
-      } else {
+    const restoreSession = async () => {
+      try {
+        const storedUser = sessionStorage.getItem('currentUser');
+        if (!storedUser) {
+          setUser(null);
+          return;
+        }
+
         const parsed = JSON.parse(storedUser) as User;
-        setUser(parsed);
+        if (!parsed?.email) {
+          setUser(parsed);
+          return;
+        }
+
+        // Always refresh from Firestore so profile fields (e.g. MS) are not stale in sessionStorage.
+        const latestUser = await loadAppUserByEmail(parsed.email);
+        const mergedUser = latestUser ? { ...parsed, ...latestUser } : parsed;
+        setUser(mergedUser);
+        sessionStorage.setItem('currentUser', JSON.stringify(mergedUser));
+      } catch (error) {
+        console.error('Restore local session failed:', error);
+        setUser(null);
+        sessionStorage.removeItem('currentUser');
+      } finally {
+        setIsAuthReady(true);
       }
-    } catch (error) {
-      console.error('Restore local session failed:', error);
-      setUser(null);
-      sessionStorage.removeItem('currentUser');
-    } finally {
-      setIsAuthReady(true);
-    }
+    };
+
+    void restoreSession();
   }, []);
 
   const login = async (email: string, password: string): Promise<LoginResult> => {

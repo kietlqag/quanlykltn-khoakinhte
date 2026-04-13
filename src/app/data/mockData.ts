@@ -7,6 +7,9 @@ export interface User {
   role: 'SV' | 'GV' | 'TBM';
   fullName: string;
   email: string;
+  ms?: string;
+  msv?: string;
+  mgv?: string;
   faculty?: string;
   expertise?: string[];
   heDaoTao?: string;

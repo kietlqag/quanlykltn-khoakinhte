@@ -108,8 +108,10 @@ function parseWorksheetRows(sheetName, worksheet, collectionPrefix) {
       const email = String(row[headerIndexes.email] || '').trim().toLowerCase();
       if (!email) continue;
       docId = slugify(email);
+      const ms = String(row[headerIndexes.ms] || '').trim();
       mappedRecord = {
         email,
+        ms,
         name: String(row[headerIndexes.ten] || '').trim(),
         role: normalizeRole(row[headerIndexes.role]),
         faculty: String(row[headerIndexes.khoa] || '').trim(),
@@ -156,6 +158,33 @@ function parseWorksheetRows(sheetName, worksheet, collectionPrefix) {
         active: ['true', '1', 'yes', 'y', 'active', 'x'].includes(activeRaw),
         startEx: String(row[headerIndexes.startex] || '').trim(),
         endEx: String(row[headerIndexes.endex] || '').trim(),
+      };
+    } else if (sheetName === 'TENDETAI') {
+      const studentRaw = String(row[headerIndexes.studentid] || row[headerIndexes.emailsv] || '').trim();
+      const type = String(row[headerIndexes.type] || row[headerIndexes.loaidetai] || '').trim().toUpperCase().includes('KLTN')
+        ? 'KLTN'
+        : 'BCTT';
+      mappedRecord = {
+        ...rawRecord,
+        studentId: studentRaw,
+        type,
+        emailSV: studentRaw,
+        loaidetai: type,
+      };
+    } else if (sheetName === 'TRANGTHAIDETAI') {
+      const studentRaw = String(row[headerIndexes.studentid] || row[headerIndexes.emailsv] || '').trim();
+      const advisorRaw = String(row[headerIndexes.advisorid] || row[headerIndexes.emailgv] || '').trim();
+      const type = String(row[headerIndexes.type] || row[headerIndexes.loaidetai] || '').trim().toUpperCase().includes('KLTN')
+        ? 'KLTN'
+        : 'BCTT';
+      mappedRecord = {
+        ...rawRecord,
+        studentId: studentRaw,
+        advisorId: advisorRaw,
+        type,
+        emailSV: studentRaw,
+        emailGV: advisorRaw,
+        loaidetai: type,
       };
     }
 
@@ -336,16 +365,26 @@ async function main() {
 
   // Keep compatibility for login flow that reads from users collection
   if (grouped.data && grouped.data.length > 0) {
+    const seenMs = new Set();
     let userBatch = db.batch();
     let count = 0;
     for (const row of grouped.data) {
       const role = String(row.data.role || '').toUpperCase();
       if (!row.data.email || !['SV', 'GV', 'TBM', 'STUDENT', 'LECTURER'].includes(role)) continue;
-      const userDoc = db.collection('users').doc(row.docId);
+      const ms = String(row.data.ms || '').trim();
+      if (!ms) {
+        throw new Error(`Missing MS for user email=${row.data.email}`);
+      }
+      if (seenMs.has(ms)) {
+        throw new Error(`Duplicate MS detected in DATA sheet: ${ms}`);
+      }
+      seenMs.add(ms);
+      const userDoc = db.collection('users').doc(ms);
       userBatch.set(
         userDoc,
         {
           email: String(row.data.email).toLowerCase(),
+          ms,
           name: row.data.name || '',
           role: normalizeRole(role),
           faculty: row.data.faculty || '',

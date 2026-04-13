@@ -24,6 +24,14 @@ type QuotaRow = {
   hasExplicitAvailable: boolean;
 };
 
+type DotOption = {
+  period: string;
+  type: 'BCTT' | 'KLTN';
+  major: string;
+  endReg: string;
+  endEx: string;
+};
+
 export function StudentRegister() {
   const location = useLocation() as { state?: { defaultType?: 'BCTT' | 'KLTN' } };
   const { user } = useAuth();
@@ -37,6 +45,7 @@ export function StudentRegister() {
   const [period, setPeriod] = useState('');
 
   const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
+  const [openDotOptions, setOpenDotOptions] = useState<DotOption[]>([]);
   const [availableFields, setAvailableFields] = useState<string[]>([]);
   const [fieldMappings, setFieldMappings] = useState<FieldRow[]>([]);
   const [quotaMappings, setQuotaMappings] = useState<QuotaRow[]>([]);
@@ -83,12 +92,12 @@ export function StudentRegister() {
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'dot'), (snapshot) => {
       const now = new Date();
-      const periods = snapshot.docs
+      const matchedDotOptions = snapshot.docs
         .map((docSnap) => {
           const data = docSnap.data();
 
           const periodValue = String(data.dot || data.maDot || data.tenDot || '').trim();
-          if (!periodValue) return '';
+          if (!periodValue) return null;
 
           const periodMajor = String(data.major || '').trim();
           const periodType = String(data.loaiDeTai || data.loaidetai || '')
@@ -110,12 +119,21 @@ export function StudentRegister() {
             normalizeText(periodMajor) === normalizeText(currentStudentMajor);
           const isTypeMatched = !periodType || periodType === type;
 
-          return active && isWithinRegWindow && isMajorMatched && isTypeMatched ? periodValue : '';
-        })
-        .filter(Boolean);
+          if (!(active && isWithinRegWindow && isMajorMatched && isTypeMatched)) return null;
 
-      const uniquePeriods = Array.from(new Set(periods));
+          return {
+            period: periodValue,
+            type: periodType === 'KLTN' ? 'KLTN' : 'BCTT',
+            major: periodMajor,
+            endReg: String(data.endReg || data.end || data.closeReg || '').trim(),
+            endEx: String(data.endEx || data.endex || '').trim(),
+          } as DotOption;
+        })
+        .filter((x): x is DotOption => Boolean(x));
+
+      const uniquePeriods = Array.from(new Set(matchedDotOptions.map((x) => x.period)));
       setAvailablePeriods(uniquePeriods);
+      setOpenDotOptions(matchedDotOptions);
 
       if (uniquePeriods.length === 0) {
         setPeriod('');
@@ -393,9 +411,10 @@ export function StudentRegister() {
       advisorId,
       period,
       status: 'pending' as const,
-      submissionDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0],
+      submissionDeadline:
+        openDotOptions.find((d) => d.period === period)?.endEx ||
+        openDotOptions.find((d) => d.period === period)?.endReg ||
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     };
 
     addThesisRegistration(newReg);

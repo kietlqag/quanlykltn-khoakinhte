@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router';
 import hcmuteLogo from '../../assets/LogoHCMUTE-NoBG.png';
@@ -16,6 +16,7 @@ import {
   BarChart3,
   User,
   Settings,
+  CalendarDays,
 } from 'lucide-react';
 
 export function DashboardLayout() {
@@ -53,6 +54,7 @@ export function DashboardLayout() {
         return [
           ...teacherMenus,
           { to: '/dashboard/teacher-approval', icon: Settings, label: 'Quản lý Quota', divider: true },
+          { to: '/dashboard/create-dot', icon: CalendarDays, label: 'Tạo đợt báo cáo' },
           { to: '/dashboard/assign-reviewer', icon: Users, label: 'Phân công phản biện' },
           { to: '/dashboard/assign-council', icon: MessageSquare, label: 'Phân công hội đồng' },
           { to: '/dashboard/statistics', icon: BarChart3, label: 'Thống kê' },

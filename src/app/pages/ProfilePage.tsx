@@ -12,7 +12,8 @@ export function ProfilePage() {
   const expertiseRemaining = Math.max(0, expertise.length - expertisePreview.length);
   const roleLabel =
     user?.role === 'SV' ? 'Sinh viên' : user?.role === 'GV' ? 'Giảng viên' : 'Trưởng bộ môn';
-  const idLabel = isStudent ? 'MSSV' : 'Mã giảng viên';
+  
+  const roleCode = user?.ms || (isStudent ? user?.msv : user?.mgv);
 
   return (
     <div className="w-full flex justify-center pt-4 font-sans">
@@ -42,8 +43,8 @@ export function ProfilePage() {
               <div className="bg-gray-50 rounded-lg px-4 py-3 flex items-center gap-3">
                 <User className="w-5 h-5 text-gray-400" />
                 <div className="min-w-0">
-                  <div className="text-xs text-gray-500">{idLabel}</div>
-                  <div className="text-sm font-semibold text-gray-900 truncate">{user?.id || '-'}</div>
+                  <div className="text-xs text-gray-500">{isStudent ? 'MSSV' : 'Mã giảng viên'}</div>
+                  <div className="text-sm font-semibold text-gray-900 truncate">{roleCode || user?.id || '-'}</div>
                 </div>
               </div>
 
@@ -117,3 +118,4 @@ export function ProfilePage() {
     </div>
   );
 }
+
