@@ -54,8 +54,8 @@ export function DashboardLayout() {
         return [
           ...teacherMenus,
           { to: '/dashboard/teacher-approval', icon: Settings, label: 'Quản lý Quota', divider: true },
-          { to: '/dashboard/create-dot', icon: CalendarDays, label: 'Tạo đợt báo cáo' },
-          { to: '/dashboard/assign-reviewer', icon: Users, label: 'Phân công phản biện' },
+          { to: '/dashboard/create-dot', icon: CalendarDays, label: 'Quản lý đợt báo cáo' },
+          { to: '/dashboard/assign-reviewer', icon: Users, label: 'Phân công PB' },
           { to: '/dashboard/assign-council', icon: MessageSquare, label: 'Phân công hội đồng' },
           { to: '/dashboard/statistics', icon: BarChart3, label: 'Thống kê' },
         ];
@@ -117,7 +117,7 @@ export function DashboardLayout() {
                     to={item.to}
                     end={item.end}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 pr-4 pl-4 py-3 rounded-lg border-l-4 border-transparent transition-colors ${
+                      `flex min-w-0 items-center gap-3 pr-4 pl-4 py-3 rounded-lg border-l-4 border-transparent transition-colors ${
                         isActive
                           ? 'bg-white/15 text-white ring-1 ring-white/20 border-[#D71920] pl-3'
                           : 'text-white/85 hover:bg-white/10 hover:text-white'
@@ -125,7 +125,7 @@ export function DashboardLayout() {
                     }
                   >
                     <item.icon className="w-5 h-5" />
-                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="truncate whitespace-nowrap text-sm font-medium">{item.label}</span>
                   </NavLink>
                 </li>
               </React.Fragment>

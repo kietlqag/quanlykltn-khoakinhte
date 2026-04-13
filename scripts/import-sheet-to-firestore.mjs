@@ -104,7 +104,9 @@ function parseWorksheetRows(sheetName, worksheet, collectionPrefix) {
     let docId = `${slugify(sheetName)}_${i + 1}`;
     let mappedRecord = { ...rawRecord };
 
-    if (sheetName === 'DATA') {
+    const sheetKey = normalizeHeader(sheetName);
+
+    if (sheetKey === 'data' || sheetKey === 'user') {
       const email = String(row[headerIndexes.email] || '').trim().toLowerCase();
       if (!email) continue;
       docId = slugify(email);
@@ -114,30 +116,34 @@ function parseWorksheetRows(sheetName, worksheet, collectionPrefix) {
         ms,
         name: String(row[headerIndexes.ten] || '').trim(),
         role: normalizeRole(row[headerIndexes.role]),
-        faculty: String(row[headerIndexes.khoa] || '').trim(),
+        faculty: String(row[headerIndexes.khoa] || row[headerIndexes.faculty] || '').trim(),
         major: String(row[headerIndexes.major] || '').trim(),
         password: String(row[headerIndexes.password] || '').trim(),
         heDaoTao: String(row[headerIndexes.hedaotao] || '').trim() || null,
       };
-    } else if (sheetName === 'QUOTA') {
-      const email = String(row[headerIndexes.emailgv] || '').trim().toLowerCase();
+    } else if (sheetKey === 'quota') {
+      const email = String(row[headerIndexes.emailgv] || row[headerIndexes.email] || '').trim().toLowerCase();
       if (!email) continue;
       const dot = String(row[headerIndexes.dot] || '').trim();
       docId = slugify(`${email}_${dot || i + 1}`);
       mappedRecord = {
         emailGV: email,
-        hoTen: String(row[headerIndexes.hoten] || '').trim(),
+        email: email,
+        hoTen: String(row[headerIndexes.hoten] || row[headerIndexes.ten] || '').trim(),
         major: String(row[headerIndexes.major] || '').trim(),
         heDaoTao: String(row[headerIndexes.hedaotao] || '').trim(),
         dot,
-        maxSlot: toNumber(row[headerIndexes.maxslot]),
+        maxSlot: toNumber(row[headerIndexes.maxslot] || row[headerIndexes.quota]),
         usedSlot: toNumber(row[headerIndexes.usedslot]),
         available: toNumber(row[headerIndexes.available]),
-        approved: ['true', '1', 'yes', 'y'].includes(
-          String(row[headerIndexes.approved] || '').trim().toLowerCase(),
-        ),
+        approved:
+          headerIndexes.approved === undefined
+            ? true
+            : ['true', '1', 'yes', 'y'].includes(
+                String(row[headerIndexes.approved] || '').trim().toLowerCase(),
+              ),
       };
-    } else if (sheetName === 'DOT') {
+    } else if (sheetKey === 'dot') {
       const maDot = String(row[headerIndexes.madot] || '').trim();
       const dotValue = String(row[headerIndexes.dot] || '').trim();
       const tenDot = String(row[headerIndexes.tendot] || '').trim();
@@ -159,7 +165,7 @@ function parseWorksheetRows(sheetName, worksheet, collectionPrefix) {
         startEx: String(row[headerIndexes.startex] || '').trim(),
         endEx: String(row[headerIndexes.endex] || '').trim(),
       };
-    } else if (sheetName === 'TENDETAI') {
+    } else if (sheetKey === 'tendetai') {
       const studentRaw = String(row[headerIndexes.studentid] || row[headerIndexes.emailsv] || '').trim();
       const type = String(row[headerIndexes.type] || row[headerIndexes.loaidetai] || '').trim().toUpperCase().includes('KLTN')
         ? 'KLTN'
@@ -171,7 +177,7 @@ function parseWorksheetRows(sheetName, worksheet, collectionPrefix) {
         emailSV: studentRaw,
         loaidetai: type,
       };
-    } else if (sheetName === 'TRANGTHAIDETAI') {
+    } else if (sheetKey === 'trangthaidetai') {
       const studentRaw = String(row[headerIndexes.studentid] || row[headerIndexes.emailsv] || '').trim();
       const advisorRaw = String(row[headerIndexes.advisorid] || row[headerIndexes.emailgv] || '').trim();
       const type = String(row[headerIndexes.type] || row[headerIndexes.loaidetai] || '').trim().toUpperCase().includes('KLTN')
@@ -364,11 +370,12 @@ async function main() {
   }
 
   // Keep compatibility for login flow that reads from users collection
-  if (grouped.data && grouped.data.length > 0) {
+  const userRows = grouped.data || grouped.user;
+  if (userRows && userRows.length > 0) {
     const seenMs = new Set();
     let userBatch = db.batch();
     let count = 0;
-    for (const row of grouped.data) {
+    for (const row of userRows) {
       const role = String(row.data.role || '').toUpperCase();
       if (!row.data.email || !['SV', 'GV', 'TBM', 'STUDENT', 'LECTURER'].includes(role)) continue;
       const ms = String(row.data.ms || '').trim();
